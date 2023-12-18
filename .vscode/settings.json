@@ -1,0 +1,18 @@
+{
+    "sync-rsync.autoShowOutput": false,
+    "sync-rsync.notification": true,
+    "sync-rsync.onSaveIndividual": true,
+    "sync-rsync.remote": "pi@192.168.1.31:/home/pi/RPiSonyRemote",
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        },
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "python.linting": false,
+    "python.linting.pylint": false,
+    "python.linting.pylama": false,
+    "python.linting.pydocstyle": false
+}

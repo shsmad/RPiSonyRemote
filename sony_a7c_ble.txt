@@ -1,0 +1,268 @@
+device:  DC:FE:23:DC:D0:DA: ILCE-7C
+        address:  DC:FE:23:DC:D0:DA
+        details:  {'path': '/org/bluez/hci0/dev_DC_FE_23_DC_D0_DA', 'props': {'Address': 'DC:FE:23:DC:D0:DA', 'AddressType': 'public', 'Name': 'ILCE-7C', 'Alias': 'ILCE-7C', 'Paired': False, 'Trusted': False, 'Blocked': False, 'LegacyPairing': False, 'RSSI': -48, 'Connected': False, 'UUIDs': ['00001800-0000-1000-8000-00805f9b34fb'], 'Adapter': '/org/bluez/hci0', 'ManufacturerData': {301: bytearray(b'\x03\x00d\x00E1"\xaf\x00!`\x00\x00\x00\x00\x00\x00\x00\x00\x00')}, 'ServicesResolved': False}}
+        name:  ILCE-7C
+        adv:  AdvertisementData(local_name='ILCE-7C', manufacturer_data={301: b'\x03\x00d\x00E1"\xaf\x00!`\x00\x00\x00\x00\x00\x00\x00\x00\x00'}, service_uuids=['00001800-0000-1000-8000-00805f9b34fb'], rssi=-48)
+                local_name:  ILCE-7C
+                manufacturer_data:  {301: b'\x03\x00d\x00E1"\xaf\x00!`\x00\x00\x00\x00\x00\x00\x00\x00\x00'}
+                platform_data:  ('/org/bluez/hci0/dev_DC_FE_23_DC_D0_DA', {'Address': 'DC:FE:23:DC:D0:DA', 'AddressType': 'public', 'Name': 'ILCE-7C', 'Alias': 'ILCE-7C', 'Paired': False, 'Trusted': False, 'Blocked': False, 'LegacyPairing': False, 'RSSI': -48, 'Connected': False, 'UUIDs': ['00001800-0000-1000-8000-00805f9b34fb'], 'Adapter': '/org/bluez/hci0', 'ManufacturerData': {301: bytearray(b'\x03\x00d\x00E1"\xaf\x00!`\x00\x00\x00\x00\x00\x00\x00\x00\x00')}, 'ServicesResolved': False})
+                rssi:  -48
+                service_data:  {}
+                service_uuids:  ['00001800-0000-1000-8000-00805f9b34fb']
+                tx_power:  None
+                
+
+DC:FE:23:DC:D0:DA: ILCE-7C
+--------------------------
+AdvertisementData(local_name='ILCE-7C', manufacturer_data={301: b'\x03\x00d\x00E1"\xef\x00!`\x00\x00\x00\x00\x00\x00\x00\x00\x00'}, service_uuids=['00001800-0000-1000-8000-00805f9b34fb'], rssi=-50)
+
+[Service] 8000ff00-ff00-ffff-ffff-ffffffffffff (Handle: 94): Unknown
+        characteristics: [<bleak.backends.bluezdbus.characteristic.BleakGATTCharacteristicBlueZDBus object at 0x75cde748>, <bleak.backends.bluezdbus.characteristic.BleakGATTCharacteristicBlueZDBus object at 0x75cde790>]
+        handle: 94
+        uuid: 8000ff00-ff00-ffff-ffff-ffffffffffff
+        char 0000ff02-0000-1000-8000-00805f9b34fb (Handle: 95): Vendor specific
+                description: Vendor specific
+                descriptors: [<bleak.backends.bluezdbus.descriptor.BleakGATTDescriptorBlueZDBus object at 0x75cde760>]
+                handle: 95
+                max_write_without_response_size: 20
+                obj: {'UUID': '0000ff02-0000-1000-8000-00805f9b34fb', 'Service': '/org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e', 'Value': bytearray(b''), 'Notifying': False, 'Flags': ['notify'], 'NotifyAcquired': False}
+                path: /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e/char005f
+                properties: ['notify']
+                service_handle: 94
+                service_uuid: 8000ff00-ff00-ffff-ffff-ffffffffffff
+                uuid: 0000ff02-0000-1000-8000-00805f9b34fb
+        char 0000ff01-0000-1000-8000-00805f9b34fb (Handle: 98): Vendor specific
+                description: Vendor specific
+                descriptors: []
+                handle: 98
+                max_write_without_response_size: 20
+                obj: {'UUID': '0000ff01-0000-1000-8000-00805f9b34fb', 'Service': '/org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e', 'Value': bytearray(b''), 'Flags': ['write']}
+                path: /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e/char0062
+                properties: ['write']
+                service_handle: 94
+                service_uuid: 8000ff00-ff00-ffff-ffff-ffffffffffff
+                uuid: 0000ff01-0000-1000-8000-00805f9b34fb
+
+
+[Service] 8000dd00-dd00-ffff-ffff-ffffffffffff (Handle: 84): Unknown
+  [Characteristic] 0000dd01-0000-1000-8000-00805f9b34fb (Handle: 85): Vendor specific (notify)
+    [Descriptor] 00002902-0000-1000-8000-00805f9b34fb (Handle: 87): Client Characteristic Configuration, Value: bytearray(b'\x00\x00')
+  [Characteristic] 0000dd21-0000-1000-8000-00805f9b34fb (Handle: 90): Vendor specific (read), Value: bytearray(b'\x06\x10\x00\x9c\x02\x00\x00')
+  [Characteristic] 0000dd11-0000-1000-8000-00805f9b34fb (Handle: 88): Vendor specific (write)
+[Service] 8000ee00-ee00-ffff-ffff-ffffffffffff (Handle: 102): Unknown
+  [Characteristic] 0000ee01-0000-1000-8000-00805f9b34fb (Handle: 103): Vendor specific (write)
+[Service] 00001801-0000-1000-8000-00805f9b34fb (Handle: 1): Generic Attribute Profile
+  [Characteristic] 00002a05-0000-1000-8000-00805f9b34fb (Handle: 2): Service Changed (indicate)
+[Service] 8000cc00-cc00-ffff-ffff-ffffffffffff (Handle: 40): Unknown
+  [Characteristic] 0000cc40-0000-1000-8000-00805f9b34fb (Handle: 78): Vendor specific (read), Value: bytearray(b'0\x00\x00FTP1\nFTP2\nFTP3\nFTP4\nFTP5\nFTP6\nFTP7\nFTP8\nFTP9\n\x00')
+  [Characteristic] 0000cc27-0000-1000-8000-00805f9b34fb (Handle: 61): Vendor specific (write)
+  [Characteristic] 0000cc24-0000-1000-8000-00805f9b34fb (Handle: 55): Vendor specific (write)
+  [Characteristic] 0000cc05-0000-1000-8000-00805f9b34fb (Handle: 46): Vendor specific (read,notify), Value: bytearray(b'\x04\x00\x00\x00\x00')
+    [Descriptor] 00002902-0000-1000-8000-00805f9b34fb (Handle: 48): Client Characteristic Configuration, Value: bytearray(b'\x00\x00')
+  [Characteristic] 0000cc28-0000-1000-8000-00805f9b34fb (Handle: 63): Vendor specific (write)
+  [Characteristic] 0000cc25-0000-1000-8000-00805f9b34fb (Handle: 57): Vendor specific (write)
+  [Characteristic] 0000cc22-0000-1000-8000-00805f9b34fb (Handle: 76): Vendor specific (write)
+  [Characteristic] 0000cc29-0000-1000-8000-00805f9b34fb (Handle: 65): Vendor specific (write)
+  [Characteristic] 0000cc01-0000-1000-8000-00805f9b34fb (Handle: 41): Vendor specific (notify)
+    [Descriptor] 00002902-0000-1000-8000-00805f9b34fb (Handle: 43): Client Characteristic Configuration, Value: bytearray(b'\x00\x00')
+  [Characteristic] 0000cc21-0000-1000-8000-00805f9b34fb (Handle: 73): Vendor specific (read,notify), Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x90 (Unknown code)
+    [Descriptor] 00002902-0000-1000-8000-00805f9b34fb (Handle: 75): Client Characteristic Configuration, Value: bytearray(b'\x00\x00')
+  [Characteristic] 0000cc2b-0000-1000-8000-00805f9b34fb (Handle: 69): Vendor specific (write)
+  [Characteristic] 0000cc23-0000-1000-8000-00805f9b34fb (Handle: 53): Vendor specific (write)
+  [Characteristic] 0000cc07-0000-1000-8000-00805f9b34fb (Handle: 51): Vendor specific (read), Value: bytearray(b'\x02\x00\x00')
+  [Characteristic] 0000cc26-0000-1000-8000-00805f9b34fb (Handle: 59): Vendor specific (write)
+  [Characteristic] 0000cc2c-0000-1000-8000-00805f9b34fb (Handle: 71): Vendor specific (write)
+  [Characteristic] 0000cc06-0000-1000-8000-00805f9b34fb (Handle: 49): Vendor specific (read), Value: bytearray(b'\x02\x00\x00')
+  [Characteristic] 0000cc02-0000-1000-8000-00805f9b34fb (Handle: 44): Vendor specific (write)
+  [Characteristic] 0000cc2a-0000-1000-8000-00805f9b34fb (Handle: 67): Vendor specific (write)
+[Service] 8000ff00-ff00-ffff-ffff-ffffffffffff (Handle: 94): Unknown
+  [Characteristic] 0000ff02-0000-1000-8000-00805f9b34fb (Handle: 95): Vendor specific (notify)
+    [Descriptor] 00002902-0000-1000-8000-00805f9b34fb (Handle: 97): Client Characteristic Configuration, Value: bytearray(b'\x01\x00')
+  [Characteristic] 0000ff01-0000-1000-8000-00805f9b34fb (Handle: 98): Vendor specific (write)
+
+  
+
+Device DC:FE:23:DC:D0:DA (public)
+        Name: ILCE-7C
+        Alias: ILCE-7C
+        Paired: no
+        Trusted: no
+        Blocked: no
+        Connected: no
+        LegacyPairing: no
+        UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+        ManufacturerData Key: 0x012d
+        ManufacturerData Value:
+  03 00 64 00 45 31 22 af 00 21 60 00 00 00 00 00  ..d.E1"..!`.....
+  00 00 00 00                                      ....            
+        RSSI: -60
+        
+Device DC:FE:23:DC:D0:DA (public)
+        Name: ILCE-7C
+        Alias: ILCE-7C
+        Paired: no
+        Trusted: no
+        Blocked: no
+        Connected: yes
+        LegacyPairing: no
+        UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+        UUID: Generic Attribute Profile (00001801-0000-1000-8000-00805f9b34fb)
+        UUID: Vendor specific           (8000cc00-cc00-ffff-ffff-ffffffffffff)
+        UUID: Vendor specific           (8000dd00-dd00-ffff-ffff-ffffffffffff)
+        UUID: Vendor specific           (8000ee00-ee00-ffff-ffff-ffffffffffff)
+        UUID: Vendor specific           (8000ff00-ff00-ffff-ffff-ffffffffffff)
+        ManufacturerData Key: 0x012d
+        ManufacturerData Value:
+  03 00 64 00 45 31 22 af 00 21 60 00 00 00 00 00  ..d.E1"..!`.....
+  00 00 00 00                                      ....
+
+Attempting to connect to DC:FE:23:DC:D0:DA
+[CHG] Device DC:FE:23:DC:D0:DA Connected: yes
+Connection successful
+[NEW] Primary Service (Handle 0xbcac)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0001
+        00001801-0000-1000-8000-00805f9b34fb
+        Generic Attribute Profile
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0001/char0002
+        00002a05-0000-1000-8000-00805f9b34fb
+        Service Changed
+[NEW] Primary Service (Handle 0x0cd4)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028
+        8000cc00-cc00-ffff-ffff-ffffffffffff
+        Vendor specific
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0029
+        0000cc01-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Descriptor (Handle 0xc4fc)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0029/desc002b
+        00002902-0000-1000-8000-00805f9b34fb
+        Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char002c
+        0000cc02-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char002e
+        0000cc05-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Descriptor (Handle 0xc4fc)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char002e/desc0030
+        00002902-0000-1000-8000-00805f9b34fb
+        Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0031
+        0000cc06-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0033
+        0000cc07-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0035
+        0000cc23-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0037
+        0000cc24-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0039
+        0000cc25-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char003b
+        0000cc26-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char003d
+        0000cc27-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char003f
+        0000cc28-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0041
+        0000cc29-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0043
+        0000cc2a-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0045
+        0000cc2b-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0047
+        0000cc2c-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0049
+        0000cc21-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Descriptor (Handle 0xc4fc)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char0049/desc004b
+        00002902-0000-1000-8000-00805f9b34fb
+        Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char004c
+        0000cc22-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0028/char004e
+        0000cc40-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Primary Service (Handle 0xf95c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0054
+        8000dd00-dd00-ffff-ffff-ffffffffffff
+        Vendor specific
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0054/char0055
+        0000dd01-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Descriptor (Handle 0xc4fc)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0054/char0055/desc0057
+        00002902-0000-1000-8000-00805f9b34fb
+        Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0054/char0058
+        0000dd11-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0054/char005a
+        0000dd21-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Primary Service (Handle 0x0c0c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e
+        8000ff00-ff00-ffff-ffff-ffffffffffff
+        Vendor specific
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e/char005f
+        0000ff02-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Descriptor (Handle 0xc4fc)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e/char005f/desc0061
+        00002902-0000-1000-8000-00805f9b34fb
+        Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service005e/char0062
+        0000ff01-0000-1000-8000-00805f9b34fb
+        Unknown
+[NEW] Primary Service (Handle 0xe00c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0066
+        8000ee00-ee00-ffff-ffff-ffffffffffff
+        Vendor specific
+[NEW] Characteristic (Handle 0x006c)
+        /org/bluez/hci0/dev_DC_FE_23_DC_D0_DA/service0066/char0067
+        0000ee01-0000-1000-8000-00805f9b34fb
+        Unknown
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 00001800-0000-1000-8000-00805f9b34fb
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 00001801-0000-1000-8000-00805f9b34fb
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 8000cc00-cc00-ffff-ffff-ffffffffffff
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 8000dd00-dd00-ffff-ffff-ffffffffffff
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 8000ee00-ee00-ffff-ffff-ffffffffffff
+[CHG] Device DC:FE:23:DC:D0:DA UUIDs: 8000ff00-ff00-ffff-ffff-ffffffffffff
+[CHG] Device DC:FE:23:DC:D0:DA ServicesResolved: yes
