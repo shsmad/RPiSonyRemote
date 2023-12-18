@@ -1,4 +1,5 @@
 import RPi.GPIO as GPIO
+
 from luma.oled.device import device as LumaDevice
 
 from libs.timer import TimerMs
@@ -14,25 +15,18 @@ class OutputDevice:
         self.activateTimer = TimerMs(activateDelay, 0, 0)
         self.deactivateTimer = TimerMs(deactivateDelay, 0, 0)
 
-    def tick(self, trigger: bool):
+    def tick(self, trigger: bool) -> None:
         pass
 
 
 class PinOutputDevice(OutputDevice):
-    def __init__(
-        self, activateDelay: int, deactivateDelay: int, enabled: bool, pin: int
-    ):
+    def __init__(self, activateDelay: int, deactivateDelay: int, enabled: bool, pin: int):
         super().__init__(activateDelay, deactivateDelay, enabled)
         self.pin = pin
         GPIO.setup(self.pin, GPIO.OUT)
 
-    def tick(self, trigger: bool):
-        if (
-            self.enabled
-            and self.trigger
-            and not self.activateTimer.active()
-            and not self.active
-        ):
+    def tick(self, trigger: bool) -> None:
+        if self.enabled and trigger and not self.activateTimer.active() and not self.active:
             self.activateTimer.setTimerMode()
             self.activateTimer.setTime(self.activateDelay)
             self.activateTimer.start()
@@ -58,19 +52,12 @@ class PinOutputDevice(OutputDevice):
 
 
 class OledOutputDevice(OutputDevice):
-    def __init__(
-        self, activateDelay: int, deactivateDelay: int, enabled: bool, oled: LumaDevice
-    ):
+    def __init__(self, activateDelay: int, deactivateDelay: int, enabled: bool, oled: LumaDevice):
         super().__init__(activateDelay, deactivateDelay, enabled)
         self.screen = oled
 
-    def tick(self, trigger: bool):
-        if (
-            self.enabled
-            and self.trigger
-            and not self.activateTimer.active()
-            and not self.active
-        ):
+    def tick(self, trigger: bool) -> None:
+        if self.enabled and trigger and not self.activateTimer.active() and not self.active:
             self.activateTimer.setTimerMode()
             self.activateTimer.setTime(self.activateDelay)
             self.activateTimer.start()

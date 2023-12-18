@@ -4,17 +4,15 @@ from .timer import TimerMs
 
 
 class Router:
-    def __init__(
-        self, input_devices: list[InputDevice], output_devices: list[OutputDevice]
-    ):
+    def __init__(self, input_devices: list[InputDevice], output_devices: list[OutputDevice]):
         self.timer = TimerMs(10, 0, 0)
         self.input_devices = input_devices
         self.output_devices = output_devices
 
-    def init(self):
+    def init(self) -> None:
         self.timer.start()
 
-    def tick(self, menu_level: int = 0):
+    def tick(self, menu_level: int = 0) -> None:
         if not self.timer.tick() or menu_level > 0:
             return
 

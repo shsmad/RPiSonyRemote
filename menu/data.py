@@ -1,3 +1,5 @@
+import dbm
+
 from enum import Enum
 from typing import Any, Optional
 
@@ -28,15 +30,41 @@ class MenuItem:
         self.default_value = default_value
 
     @property
-    def value(self):
+    def value(self) -> Any:
+        print(f"in getter {self.title}")
+        try:
+            from_db = self.storage.get(self.title)
+            if not from_db:
+                return self.default_value
+
+            if self.type == ParamType.BOOL:
+                return bool(from_db)
+            elif self.type == ParamType.INT:
+                return int(from_db)
+            elif self.type == ParamType.FLOAT:
+                return float(from_db)
+            else:
+                return None
+        except Exception as e:
+            print(e)
+
         return self.storage.get(self.title, self.default_value)
 
     @value.setter
-    def value(self, v):
-        self.storage[self.title] = v
+    def value(self, v: Any) -> None:
+        print(f"in setter {self.title} {v}")
+        try:
+            if self.type == ParamType.BOOL:
+                self.storage[self.title] = "1" if v else ""
+            elif self.type in (ParamType.INT, ParamType.FLOAT):
+                self.storage[self.title] = str(v)
+            else:
+                return
+        except Exception as e:
+            print(e)
 
 
-def create_menu_tree(storage):
+def create_menu_tree(storage: dbm._Database) -> list[MenuItem]:
     exit_item = MenuItem("Exit", ParamType.EXIT, storage)
 
     return [

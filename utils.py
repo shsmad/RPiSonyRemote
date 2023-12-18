@@ -1,3 +1,7 @@
+from enum import Enum
+from typing import Union
+
+
 def circular_increment(value: int, minimum: int, maximum: int, increment: int) -> int:
     """
     Increments a value within a circular range.
@@ -18,19 +22,13 @@ def circular_increment(value: int, minimum: int, maximum: int, increment: int) -
     return (value - minimum + increment) % (maximum - minimum + 1) + minimum
 
 
-from enum import Enum
-from typing import Union
-
-
 class TextAlign(Enum):
     TA_LEFT = 0
     TA_CENTER = 1
     TA_RIGHT = 2
 
 
-def get_x_position(
-    max_width: int, align: TextAlign, letter_width: int, value: Union[int, float, str]
-):
+def get_x_position(max_width: int, align: TextAlign, letter_width: int, value: Union[int, float, str]) -> int:
     """
     Gets the x position of the text.
 
@@ -56,7 +54,7 @@ def get_x_position(
     elif isinstance(value, int):
         value_str = str(value)
     elif isinstance(value, float):
-        value_str = "{:.2f}".format(value)
+        value_str = f"{value:.2f}"
 
     if align == TextAlign.TA_CENTER:
         return round((max_width - len(value_str)) * letter_width / 2)

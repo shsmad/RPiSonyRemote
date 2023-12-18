@@ -1,8 +1,14 @@
 import asyncio
 import dbm
+import logging
 import sys
 
+from typing import Any
+
 import RPi.GPIO as GPIO
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 # define EB_HOLD 500
 # define EB_FAST 50
@@ -20,6 +26,7 @@ import RPi.GPIO as GPIO
 # include "ble/RemoteStatus.h"
 # include "ble/BLEScanner.h"
 # include "ble/BLECamera.h"
+
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 
@@ -35,32 +42,61 @@ device = ssd1306(serial)
 
 storage = dbm.open("storage", "c")
 
-oled_menu = OledMenu(None, None, oled=device, storage=storage)
+oled_menu = OledMenu(None, oled=device, settingsstorage=storage)
 
 router = Router([], [])
 
 
-async def on_btn_left(event_type, *args):
-    # Handle button events here
+async def on_btn_left(event_type: str, *args: Any) -> None:
+    """
+    Handle button events.
+
+    Args:
+        event_type (str): The type of button event.
+        *args (Tuple): Additional arguments for the event.
+
+    Returns:
+        None
+    """
     print("on_btn_left", event_type, args)
-    if event_type == "click":
+    if event_type in {"click", "step"}:
         oled_menu.onRotate(-1, 1, False)
 
 
-async def on_btn_right(event_type, *args):
-    # Handle button events here
+async def on_btn_right(event_type: str, *args: Any) -> None:
+    """
+    Handle button events.
+
+    Args:
+        event_type (str): The type of button event.
+        *args: Additional arguments.
+
+    Returns:
+        None
+    """
     print("on_btn_right", event_type, args)
-    if event_type == "click":
+    if event_type in {"click", "step"}:
         oled_menu.onRotate(1, 1, False)
 
 
-async def on_btn_press(event_type, *args):
+async def on_btn_press(event_type: str, *args: Any) -> None:
+    """
+    Handle button events.
+
+    Args:
+        event_type (str): The type of button event.
+        args (tuple): Additional arguments for the event.
+
+    Returns:
+        None
+    """
     # Handle button events here
     print("on_btn_press", event_type, args)
     if event_type == "click":
-        oled_menu.onKeyClick()
-    elif event_type in ("hold", "step"):
-        oled_menu.onKeyHeld()
+        if args[2]:
+            oled_menu.onKeyClickAfterHold(*args)
+        else:
+            oled_menu.onKeyClick()
 
 
 btn_left = Button(5, callback=on_btn_left)
@@ -68,7 +104,7 @@ btn_right = Button(26, callback=on_btn_right)
 btn_press = Button(13, callback=on_btn_press)
 
 
-def setup():
+def setup() -> None:
     router.init()
     oled_menu.init()
 
@@ -77,6 +113,7 @@ setup()
 
 try:
     loop = asyncio.get_event_loop()
+    loop.set_debug(True)
     loop.run_forever()
 except Exception:
     print("Error:", sys.exc_info()[0])

@@ -14,9 +14,7 @@ class InputDevice:
     lastValue = 0
     changed = False
 
-    def __init__(
-        self, pin: int, mode: IDeviceTriggerMode, enabled: bool, read_time: int
-    ):
+    def __init__(self, pin: int, mode: IDeviceTriggerMode, enabled: bool, read_time: int):
         self.pin = pin
         self.mode = mode  # from settings
         self.enabled = enabled  # from settings
@@ -24,7 +22,7 @@ class InputDevice:
         self.readTimer = TimerMs(read_time, 1, 0)
 
     def handle(self) -> bool:
-        pass
+        return False
 
     def current(self) -> int:
         return self.lastValue
@@ -36,9 +34,7 @@ class InputDevice:
 
 
 class DigitalInputDevice(InputDevice):
-    def __init__(
-        self, pin: int, mode: IDeviceTriggerMode, enabled: bool, read_time: int
-    ):
+    def __init__(self, pin: int, mode: IDeviceTriggerMode, enabled: bool, read_time: int):
         super().__init__(pin, mode, enabled, read_time)
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -47,11 +43,7 @@ class DigitalInputDevice(InputDevice):
             return False
 
         if not self.readTimer.tick():
-            return (
-                self.lastValue == 1
-                if self.mode == IDeviceTriggerMode.ABOVE_THRESHOLD
-                else self.lastValue == 0
-            )
+            return self.lastValue == 1 if self.mode == IDeviceTriggerMode.ABOVE_THRESHOLD else self.lastValue == 0
 
         value = GPIO.input(self.pin)
 
@@ -59,11 +51,7 @@ class DigitalInputDevice(InputDevice):
             self.lastValue = value
             self.changed = True
 
-        return (
-            self.lastValue == 1
-            if self.mode == IDeviceTriggerMode.ABOVE_THRESHOLD
-            else self.lastValue == 0
-        )
+        return self.lastValue == 1 if self.mode == IDeviceTriggerMode.ABOVE_THRESHOLD else self.lastValue == 0
 
 
 class AnalogInputDevice(InputDevice):

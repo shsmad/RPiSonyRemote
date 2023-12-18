@@ -41,18 +41,18 @@ class TimerMs:
             self.start()
         self._run_once = run_once
 
-    def set_timer_mode(self):
+    def set_timer_mode(self) -> None:
         """Set the timer to run only once."""
 
         self._run_once = True
 
-    def set_period_mode(self):
+    def set_period_mode(self) -> None:
         """Set the timer to run periodically."""
 
         self._run_once = False
 
     # установить время
-    def set_time(self, prd_ms: int):
+    def set_time(self, prd_ms: int) -> None:
         """Set the time period of the timer.
 
         Args:
@@ -62,7 +62,7 @@ class TimerMs:
 
         self._prd = prd_ms or 1
 
-    def attach(self, handler: Callable):
+    def attach(self, handler: Callable) -> None:
         """Attach a callback function to the timer.
 
         Args:
@@ -72,24 +72,24 @@ class TimerMs:
 
         self._handler = handler
 
-    def detach(self):
+    def detach(self) -> None:
         """Detach the callback function from the timer."""
 
         self._handler = None
 
-    def start(self):
+    def start(self) -> None:
         """Start or restart the timer."""
 
         self._is_running = True
         self._started_at = self.uptime()
         self._passed_delta = 0
 
-    def restart(self):
+    def restart(self) -> None:
         """Restart the timer by calling the start method."""
 
         self.start()
 
-    def resume(self):
+    def resume(self) -> None:
         """Resume the timer after it has been stopped.
 
         If the timer is not running, the start time is adjusted to account for the time passed during the pause.
@@ -100,7 +100,7 @@ class TimerMs:
             self._started_at = self.uptime() - self._passed_delta
         self._is_running = True
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop or pause the timer.
 
         If the timer is running, the elapsed time is calculated and stored.
@@ -111,7 +111,7 @@ class TimerMs:
             self._passed_delta = self.uptime() - self._started_at
         self._is_running = False
 
-    def force(self):
+    def force(self) -> None:
         """Forcefully reset the timer.
 
         The start time is adjusted to simulate the timer reaching its period.
@@ -136,9 +136,7 @@ class TimerMs:
 
         if self._is_running and self._passed_delta >= self._prd:
             if not self._run_once:
-                self._started_at += self._passed_delta - (
-                    self._passed_delta % self._prd
-                )
+                self._started_at += self._passed_delta - (self._passed_delta % self._prd)
             else:
                 self.stop()
 
@@ -195,7 +193,7 @@ class TimerMs:
         """
         return self._is_running and not self.elapsed()
 
-    def time_left(self, as_ns=False) -> int:
+    def time_left(self, as_ns: bool = False) -> int:
         """Get the remaining time of the timer.
 
         Args:

@@ -1,7 +1,9 @@
 import asyncio
-import time
+import dbm
+
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
 from luma.core.render import canvas
 from luma.oled.device import device as LumaDevice
@@ -15,10 +17,19 @@ from .data import MenuItem, ParamType, create_menu_tree
 FONTS = {x: ImageFont.truetype("fonts/better-vcr-5.2.ttf", x) for x in range(4, 33, 2)}
 
 
-async def process_timer(interval, callback):
+async def process_timer(interval: int, callback: Callable[[], None]) -> None:
+    """
+    Run a timer that calls a callback function repeatedly at a given interval.
+
+    Args:
+        interval (int): The interval in milliseconds.
+        callback (Callable[[], None]): The callback function to be called.
+
+    Returns:
+        None
+    """
     while True:
         await asyncio.sleep(interval / 1000)
-
         callback()
 
 
@@ -26,38 +37,78 @@ class OledMenu:
     _current_menu_position = [0, 0, 0]
     _edit_precision = 0
     # AnalogInputDevice *ameter;
-    # EESettings * eesettings;
-    _sub_menu_size = {7, 1, 6, 2}
-    _reset_to_splashscreen_task = None
+    _t_reset_to_splashscreen: Optional[asyncio.Task] = None
 
     def __init__(
         self,
-        ameter,
-        eesettings,
-        reset_to_splash_timeout: Optional[int] = 5000,
-        oled: Optional[LumaDevice] = None,
-        storage=None,
-    ):
+        ameter: Any,  # Replace Any with the appropriate type
+        oled: LumaDevice,
+        settingsstorage: dbm._Database,  # Replace Any with the appropriate type
+        reset_to_splash_timeout: int = 3000,
+    ) -> None:
+        """
+        Initialize MyClass.
+
+        Args:
+            ameter: The ameter object.
+            oled: The LumaDevice object.
+            reset_to_splash_timeout: The timeout for resetting to splash screen.
+            settingsstorage: The settings storage object.
+        """
         self._reset_to_splash_timeout = reset_to_splash_timeout
         self._refreshTimer = TimerMs(500, start=True, run_once=False)
         self.ameter = ameter
-        self.eesettings = eesettings
+        self.settingsstorage = settingsstorage
         self.menuLevel = 0
 
-        self.menuItems = create_menu_tree(storage=storage)
+        self.menuItems = create_menu_tree(storage=self.settingsstorage)
         self._oled = oled
 
-    def init(self):
+    def init(self) -> None:
+        """
+        Initializes the object and draws the splash screen.
+        """
         self.draw_splash_screen()
 
-    def draw_splash_screen(self):
-        now = time.ctime()
+    def _splashscreen_timer_start(self) -> None:
+        """
+        Start the splashscreen timer.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        if self._t_reset_to_splashscreen:
+            self._t_reset_to_splashscreen.cancel()
+
+        self._t_reset_to_splashscreen = asyncio.create_task(
+            process_timer(self._reset_to_splash_timeout, self.reset_to_splashscreen)
+        )
+
+    def _splashscreen_timer_stop(self) -> None:
+        """
+        Stop the splash screen timer.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        if self._t_reset_to_splashscreen:
+            self._t_reset_to_splashscreen.cancel()
+            self._t_reset_to_splashscreen = None
+
+    def draw_splash_screen(self) -> None:
+        now = datetime.now().strftime("%H:%M:%S")
         with canvas(self._oled) as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
             draw.text((0, 1), f"RPiRemote {now}", fill="white", font=FONTS[8])
 
             for idx, i in enumerate(self._current_menu_position):
-                draw.text((idx * 16, 16), f"{i}", fill="white", font=FONTS[8])
+                draw.text((idx * 16, 16), f"{i}", fill="white", font=FONTS[12])
 
         # // if (eesettings->analog_trigger_enable){
         # //     int oledLevel = map(ameter->current(), ameter->minVal(), ameter->maxVal(), 0, 64);
@@ -70,28 +121,24 @@ class OledMenu:
         # //     oled.fastLineV(oledLevel, 25, 31, OLED_STROKE);
         # // }
 
-    def draw_menu_screen(self, position: int):
+    def draw_menu_screen(self, position: int) -> None:
         with canvas(self._oled) as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
-            font_8 = FONTS[16]
-            margin_x = (
-                self._oled.width - font_8.getlength(self.menuItems[position].title)
-            ) / 2
+            font_16 = FONTS[16]
+            margin_x = (self._oled.width - font_16.getlength(self.menuItems[position].title)) / 2
             draw.text(
-                (margin_x, 1), self.menuItems[position].title, fill="white", font=font_8
+                (margin_x, 1),
+                self.menuItems[position].title,
+                fill="white",
+                font=font_16,
             )
 
-            for idx, item in enumerate(self.menuItems):
-                if not item.icon:
-                    continue
+            padding_x = (self._oled.width - len(self.menuItems) * 24) / 2
+            icon_items = [(idx, item) for idx, item in enumerate(self.menuItems) if item.icon]
 
-                icon_path = str(
-                    Path(__file__)
-                    .resolve()
-                    .parent.parent.joinpath("images", f"{item.icon}.png")
-                )
+            for idx, item in icon_items:
+                icon_path = str(Path(__file__).resolve().parent.parent.joinpath("images", f"{item.icon}.png"))
 
-                padding_x = (self._oled.width - len(self.menuItems) * 24) / 2
                 icon = Image.open(icon_path).convert("RGBA")
                 draw.bitmap((idx * 24 + padding_x, 32), icon, fill="white")
 
@@ -107,19 +154,14 @@ class OledMenu:
                         outline="white",
                     )
 
-    def draw_submenu_screen(self, parent_position: int, position: int):
-        print(f"helo {parent_position} {position}")
+    def draw_submenu_screen(self, parent_position: int, position: int) -> None:
         current_item = self.menuItems[parent_position].children[position]
-        print(current_item.title, current_item.type)
-        try:
-            current_item.value
-        except Exception as e:
-            print(e)
+
         with canvas(self._oled) as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
 
-            font_8 = FONTS[8]
-            draw.text((0, 0), current_item.title, fill="white", font=font_8)
+            font_16 = FONTS[16]
+            draw.text((0, 0), current_item.title, fill="white", font=font_16)
 
             if current_item.type == ParamType.EXIT:
                 return
@@ -131,12 +173,12 @@ class OledMenu:
                 text = str(current_item.value)
 
             if current_item.type == ParamType.FLOAT:
-                text = "{:.2f}".format(current_item.value)
+                text = f"{current_item.value:.2f}"
 
-            x = self._oled.width - font_8.getlength(text)
-            draw.text((x, 16), text, fill="white", font=font_8)
+            x = self._oled.width - font_16.getlength(text)
+            draw.text((x, 48), text, fill="white", font=font_16)
 
-    def tick(self):
+    def tick(self) -> None:
         if not self._refreshTimer.tick():
             return
 
@@ -147,11 +189,12 @@ class OledMenu:
         #    self.drawSplashScreen()
         # };
 
-    def reset_to_splashscreen(self):
+    def reset_to_splashscreen(self) -> None:
+        self._splashscreen_timer_stop()
         self.menuLevel = 0
         self.draw_splash_screen()
 
-    def onKeyClick(self):
+    def onKeyClick(self) -> None:
         """
         menuLevel:
             0 - splash screen
@@ -160,20 +203,13 @@ class OledMenu:
             3 - editor
         """
 
-        print(f"onKeyClick {self.menuLevel}")
-
         if self.menuLevel == 0:
-            self.menuLevel = 1
-            self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-            self._reset_to_splashscreen_task = asyncio.create_task(  # TODO: rewrite to function which checks and cancel first
-                process_timer(self._reset_to_splash_timeout, self.reset_to_splashscreen)
-            )
+            self.on_key_press_splashscreen()
             return
 
         if self.menuLevel == 1:
             self.menuLevel = 2
-            if self._reset_to_splashscreen_task:
-                self._reset_to_splashscreen_task.cancel()
+            self._splashscreen_timer_stop()
             self._current_menu_position[self.menuLevel] = 0
             self.draw_submenu_screen(
                 self._current_menu_position[self.menuLevel - 1],
@@ -182,59 +218,58 @@ class OledMenu:
             return
 
         if self.menuLevel == 2:
-            current_item = self.menuItems[
-                self._current_menu_position[self.menuLevel - 1]
-            ][self._current_menu_position[self.menuLevel]]
+            current_item = self.menuItems[self._current_menu_position[self.menuLevel - 1]].children[
+                self._current_menu_position[self.menuLevel]
+            ]
 
             if current_item.type == ParamType.EXIT:
                 self.menuLevel = 1
                 self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-                self._reset_to_splashscreen_task = asyncio.create_task(
-                    process_timer(
-                        self._reset_to_splash_timeout, self.reset_to_splashscreen
-                    )
-                )
+                self._splashscreen_timer_start()
                 return
 
             if current_item.type in (ParamType.BOOL, ParamType.INT, ParamType.FLOAT):
                 self._edit_precision = 0
                 self.menuLevel = 3
-                drawItemEditor(self._oled, current_item, self._edit_precision)
+                draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
         if self.menuLevel == 3:
             self.menuLevel = 2
             self.draw_submenu_screen(
-                self.currentMenuPosition[self.menuLevel - 1],
-                self.currentMenuPosition[self.menuLevel],
+                self._current_menu_position[self.menuLevel - 1],
+                self._current_menu_position[self.menuLevel],
             )
             return
 
-    def onKeyHeld(self):
+    def on_key_press_splashscreen(self) -> None:
+        self.menuLevel = 1
+        self.draw_menu_screen(self._current_menu_position[self.menuLevel])
+        self._splashscreen_timer_start()
+
+    def onKeyClickAfterHold(self, pin: int, steps: int, hold: int) -> None:
         if self.menuLevel == 3:
             self._edit_precision = circular_increment(self._edit_precision, 0, 2, 1)
-            with canvas(self._oled) as draw:
-                draw.line(
-                    [
-                        (self._oled.width - 12 * self._edit_precision - 8, 31),
-                        (self._oled.width, 31),
-                    ],
-                    fill="black",
-                )
-                draw.line(
-                    [(0, 31), (self._oled.width - 12 * self._edit_precision - 8, 31)],
-                    fill="white",
-                )
+            try:
+                current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
+                    self._current_menu_position[self.menuLevel - 1]
+                ]
+                if current_item.type in (
+                    ParamType.BOOL,
+                    ParamType.INT,
+                    ParamType.FLOAT,
+                ):
+                    draw_item_editor(self._oled, current_item, self._edit_precision)
+            except Exception as e:
+                print(e)
 
-    def onRotate(self, direction: int, counter: int, fast: bool):
+    def onRotate(self, direction: int, counter: int, fast: bool) -> None:
         menu_length = 0
         if self.menuLevel == 1:
             menu_length = len(self.menuItems) - 1
         elif self.menuLevel == 2:
-            menu_length = (
-                self._sub_menu_size[self._current_menu_position[self.menuLevel - 1]] - 1
-            )
-            # menu_length = len(self.menuItems[self.currentMenuPosition[1]]) - 1
+            parent_menu_item = self.menuItems[self._current_menu_position[self.menuLevel - 1]]
+            menu_length = len(parent_menu_item.children) - 1
 
         if self.menuLevel < 3:
             self._current_menu_position[self.menuLevel] = circular_increment(
@@ -244,9 +279,9 @@ class OledMenu:
                 direction * (10 if fast else 1),
             )
         if self.menuLevel == 3:
-            current_item = self.menuItems[
-                self._current_menu_position[self.menuLevel - 2]
-            ][self._current_menu_position[self.menuLevel - 1]]
+            current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
+                self._current_menu_position[self.menuLevel - 1]
+            ]
 
             if current_item.type == ParamType.EXIT:
                 return
@@ -254,56 +289,56 @@ class OledMenu:
             if current_item.type == ParamType.BOOL:
                 print(f"Here we rotate {current_item.title}")
                 current_item.value = not current_item.value
-                drawItemEditor(self._oled, current_item, 0)
+                draw_item_editor(self._oled, current_item, 0)
                 return
 
-            if current_item.type == ParamType.INT:
-                int_delta = 1
-                if self._edit_precision == 0:
-                    int_delta = direction
-                elif self._edit_precision == 1:
-                    int_delta = direction * 10
-                elif self._edit_precision == 2:
-                    int_delta = direction * 100
+            delta: Union[int, float] = 0
 
-                current_item.value = current_item.value + int_delta
-                drawItemEditor(self._oled, current_item, self._edit_precision)
+            if current_item.type == ParamType.INT:
+                delta = int_delta(direction, self._edit_precision)
+                current_item.value = current_item.value + delta
+                draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
             if current_item.type == ParamType.FLOAT:
-                delta = 0.0
-                if self._edit_precision == 0:
-                    delta = direction * 0.01
-                elif self._edit_precision == 1:
-                    delta = direction * 0.1
-                elif self._edit_precision == 2:
-                    delta = direction
-
+                delta = float_delta(direction, self._edit_precision)
                 current_item.value = current_item.value + delta
-                drawItemEditor(self._oled, current_item, self._edit_precision)
+                draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
         if self.menuLevel == 1:
             self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-            self._reset_to_splashscreen_task = asyncio.create_task(
-                process_timer(self._reset_to_splash_timeout, self.reset_to_splashscreen)
-            )
+            self._splashscreen_timer_start()
             return
 
         if self.menuLevel == 2:
             self.draw_submenu_screen(
                 parent_position=self._current_menu_position[self.menuLevel - 1],
-                child_position=self._current_menu_position[self.menuLevel],
+                position=self._current_menu_position[self.menuLevel],
             )
             return
 
 
-def drawItemEditor(screen: LumaDevice, item: MenuItem, precision: int = 0):
+def int_delta(value: int, precision: int) -> int:
+    fix_multiply = [1, 10, 100]
+    if 0 <= precision < len(fix_multiply):
+        return value * fix_multiply[precision]
+    return value
+
+
+def float_delta(value: int, precision: int) -> float:
+    fix_multiply = [0.01, 0.1, 1]
+    if 0 <= precision < len(fix_multiply):
+        return value * fix_multiply[precision]
+    return value
+
+
+def draw_item_editor(screen: LumaDevice, item: MenuItem, precision: int = 0) -> None:
     with canvas(screen) as draw:
-        font_8 = FONTS[8]
+        font_16 = FONTS[16]
         draw.rectangle(screen.bounding_box, outline="black", fill="black")
 
-        draw.text((0, 0), item.title, fill="white", font=font_8)
+        draw.text((0, 0), item.title, fill="white", font=font_16)
 
         if item.type == ParamType.BOOL:
             text = "True" if item.value else "False"
@@ -312,9 +347,28 @@ def drawItemEditor(screen: LumaDevice, item: MenuItem, precision: int = 0):
             text = str(item.value)
 
         if item.type == ParamType.FLOAT:
-            text = "{:.2f}".format(item.value)
+            text = f"{item.value:.2f}"
 
-        x = screen.width - font_8.getlength(text)
-        draw.text((x, 16), text, fill="white", font=font_8)
+        x = screen.width - font_16.getlength(text)
+        letter_width = font_16.getlength("0")
+        draw.rectangle(
+            [(x, 48), (screen.width - letter_width * precision, 63)],
+            outline="white",
+            fill="white",
+        )
 
-        draw.line([(0, 31), (screen.width - 12 * precision - 8, 31)], fill="white")
+        if precision:
+            selected_part = text[:-precision]
+            rest_part = text[-precision:]
+        else:
+            selected_part = text
+            rest_part = None
+
+        draw.text((x, 48), selected_part, fill="black", outline="white", font=font_16)
+        if rest_part:
+            draw.text(
+                (screen.width - letter_width * precision, 48),
+                rest_part,
+                fill="white",
+                font=font_16,
+            )

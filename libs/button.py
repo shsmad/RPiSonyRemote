@@ -1,13 +1,15 @@
 import asyncio
 import time
+
 from math import floor
 from threading import Timer
+from typing import Callable, Optional
 
 import RPi.GPIO as GPIO
 
 
 class RepeatTimer(Timer):
-    def run(self):
+    def run(self) -> None:
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
 
@@ -19,12 +21,12 @@ KEY_UP = 1
 class Button:
     def __init__(
         self,
-        pin,
-        callback=None,
-        debounce_time=50,
-        hold_time=500,
-        click_count_time=500,
-        step_count_time=200,
+        pin: int,
+        callback: Optional[Callable] = None,
+        debounce_time: int = 50,
+        hold_time: int = 500,
+        click_count_time: int = 500,
+        step_count_time: int = 200,
     ):
         self.pin = pin
         self.callback = callback
@@ -47,7 +49,7 @@ class Button:
 
         self.timer.start()
 
-    def tick(self):
+    def tick(self) -> None:
         new_state = GPIO.input(self.pin)
         old_state = self.state
 
@@ -61,22 +63,30 @@ class Button:
 
         if new_state != self.state:
             self.state = new_state
-            self.last_change_time = now  # ms
 
             if new_state == KEY_DOWN:
                 self.is_pressed = True
                 if self.callback is not None:
                     asyncio.run_coroutine_threadsafe(
-                        self.callback("press", [self.pin]),
+                        self.callback("press", self.pin),
                         loop=self.loop,
                     )
             else:
+                time_passed = now - self.last_change_time  # ms
+                steps_count = floor(time_passed / self.step_count_time)
                 self.is_pressed = False
                 if self.callback is not None:
                     asyncio.run_coroutine_threadsafe(
-                        self.callback("click", [self.pin]),
+                        self.callback(
+                            "click",
+                            self.pin,
+                            steps_count,
+                            max(time_passed - self.hold_time, 0),
+                        ),
                         loop=self.loop,
                     )
+
+            self.last_change_time = now  # ms
 
         else:
             time_passed = now - self.last_change_time  # ms
@@ -86,15 +96,15 @@ class Button:
                 self.steps_count = steps_count
                 if self.callback is not None:
                     asyncio.run_coroutine_threadsafe(
-                        self.callback("step", [self.pin, steps_count]),
+                        self.callback("step", self.pin, steps_count),
                         loop=self.loop,
                     )
 
             if time_passed > self.hold_time and self.callback is not None:
                 asyncio.run_coroutine_threadsafe(
-                    self.callback("hold", [self.pin, time_passed - self.hold_time]),
+                    self.callback("hold", self.pin, time_passed - self.hold_time),
                     loop=self.loop,
                 )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         GPIO.cleanup(self.pin)
