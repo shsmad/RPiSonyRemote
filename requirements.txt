@@ -1,3 +1,8 @@
 bleak
 luma.oled
 RPI.GPIO
+Pillow
+psutil
+RPi_AS3935
+smbus
+pyyaml

@@ -1,14 +1,14 @@
 import asyncio
-import dbm
 
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
 from luma.core.render import canvas
 from luma.oled.device import device as LumaDevice
-from PIL import Image, ImageFont
+from PIL import ImageFont
 
+from libs.fontawesome import fa
+from libs.hwinfo import HWInfo
 from libs.timer import TimerMs
 from utils import circular_increment
 
@@ -38,12 +38,13 @@ class OledMenu:
     _edit_precision = 0
     # AnalogInputDevice *ameter;
     _t_reset_to_splashscreen: Optional[asyncio.Task] = None
+    _t_update_hwinfo: Optional[asyncio.Task] = None
 
     def __init__(
         self,
         ameter: Any,  # Replace Any with the appropriate type
         oled: LumaDevice,
-        settingsstorage: dbm._Database,  # Replace Any with the appropriate type
+        settingsstorage: Any,  # Replace Any with the appropriate type
         reset_to_splash_timeout: int = 3000,
     ) -> None:
         """
@@ -63,12 +64,73 @@ class OledMenu:
 
         self.menuItems = create_menu_tree(storage=self.settingsstorage)
         self._oled = oled
+        self.draw = canvas(self._oled)
+        self.hwinfo = HWInfo()
 
     def init(self) -> None:
         """
         Initializes the object and draws the splash screen.
         """
         self.draw_splash_screen()
+
+    def update_hwinfo(self) -> None:
+        """
+        Update the hardware info.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        self.hwinfo.update()
+        if self.hwinfo.is_changed() and self.menuLevel == 0:
+            data = self.hwinfo.read_and_reset()
+
+            try:
+                with self.draw as draw:
+                    draw.rectangle((0, 47, self._oled.width, self._oled.height), outline="black", fill="black")
+                    draw.text(
+                        (0, 48),
+                        f"C{data['cpu']:2d} M{data['memory']:2d} V{data['voltage']:3.1f} {data['capacity']:2d}% {data['temperature']:2d}℃",
+                        font=FONTS[8],
+                        fill=255,
+                    )
+                    draw.text((0, 57), data["ip"], font=FONTS[8], fill=255)
+            except Exception as e:
+                print(e)
+
+        self._hwinfo_timer_stop()
+        self._hwinfo_timer_start()
+
+    def _hwinfo_timer_start(self) -> None:
+        """
+        Start the hardware info timer.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        if self._t_update_hwinfo:
+            self._t_update_hwinfo.cancel()
+
+        self._t_update_hwinfo = asyncio.create_task(process_timer(100, self.update_hwinfo))
+
+    def _hwinfo_timer_stop(self) -> None:
+        """
+        Stop the hardware info timer.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
+        if self._t_update_hwinfo:
+            self._t_update_hwinfo.cancel()
+            self._t_update_hwinfo = None
 
     def _splashscreen_timer_start(self) -> None:
         """
@@ -103,7 +165,7 @@ class OledMenu:
 
     def draw_splash_screen(self) -> None:
         now = datetime.now().strftime("%H:%M:%S")
-        with canvas(self._oled) as draw:
+        with self.draw as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
             draw.text((0, 1), f"RPiRemote {now}", fill="white", font=FONTS[8])
 
@@ -122,7 +184,7 @@ class OledMenu:
         # // }
 
     def draw_menu_screen(self, position: int) -> None:
-        with canvas(self._oled) as draw:
+        with self.draw as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
             font_16 = FONTS[16]
             margin_x = (self._oled.width - font_16.getlength(self.menuItems[position].title)) / 2
@@ -137,10 +199,8 @@ class OledMenu:
             icon_items = [(idx, item) for idx, item in enumerate(self.menuItems) if item.icon]
 
             for idx, item in icon_items:
-                icon_path = str(Path(__file__).resolve().parent.parent.joinpath("images", f"{item.icon}.png"))
-
-                icon = Image.open(icon_path).convert("RGBA")
-                draw.bitmap((idx * 24 + padding_x, 32), icon, fill="white")
+                text, font = fa(item.icon, 16)
+                draw.text((idx * 24 + padding_x + 6, 32 + 4), text, fill="white", font=font)
 
                 if idx == position:
                     draw.rounded_rectangle(
@@ -178,9 +238,11 @@ class OledMenu:
             x = self._oled.width - font_16.getlength(text)
             draw.text((x, 48), text, fill="white", font=font_16)
 
-    def tick(self) -> None:
-        if not self._refreshTimer.tick():
-            return
+    async def tick(self) -> None:
+        # print("oled tick")
+        self._hwinfo_timer_start()
+        # if not self._refreshTimer.tick():
+        #     return
 
         # if self._resetToSplashScreenTimer.ready() or ((self.menuLevel == 0) and ameter->isEnabled() && ameter->isChanged()))
         # {
