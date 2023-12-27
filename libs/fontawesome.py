@@ -1,3 +1,5 @@
+# https://fontawesome.com/search?q=signal&o=r&m=free
+
 from PIL import ImageFont
 
 _styles = ["solid", "regular", "brands"]
@@ -6,6 +8,7 @@ _fonts = {
     "solid": {x: ImageFont.truetype("fonts/fa-solid-900.ttf", x) for x in (8, 16, 24, 32, 48, 64)},
     "regular": {x: ImageFont.truetype("fonts/fa-regular-400.ttf", x) for x in (8, 16, 24, 32, 48, 64)},
     "brands": {x: ImageFont.truetype("fonts/fa-brands-400.ttf", x) for x in (8, 16, 24, 32, 48, 64)},
+    "solidpro": {x: ImageFont.truetype("fonts/fa-solid-900-pro.ttf", x) for x in (8, 16, 24, 32, 48, 64)},
 }
 
 _codes = {
@@ -1932,6 +1935,37 @@ _codes = {
     "zhihu": {"label": "Zhihu", "styles": ["brands"], "unicode": "\uf63f"},
 }
 
+# PRO
+_codes.update(
+    {
+        "wave-sine": {"label": "Wave Sine", "styles": ["solidpro"], "unicode": "\uf899"},
+        "signal-stream": {"label": "Signal Stream", "styles": ["solidpro"], "unicode": "\uf8dd"},
+        "dial": {"label": "Dial", "styles": ["solidpro"], "unicode": "\ue15b"},
+        "arrow-up-from-dotted-line": {
+            "label": "Arrow Up From Dotted Line",
+            "styles": ["solidpro"],
+            "unicode": "\ue09b",
+        },
+        "arrow-down-from-dotted-line": {
+            "label": "Arrow Down From Dotted Line",
+            "styles": ["solidpro"],
+            "unicode": "\ue090",
+        },
+        "arrow-turn-down-left": {
+            "label": "Arrow Turn Down Left",
+            "styles": ["solidpro"],
+            "unicode": "\ue2e1",
+        },
+        "chess-clock-flip": {
+            "label": "Chess Clock Flip",
+            "styles": ["solidpro"],
+            "unicode": "\uf43e",
+        },
+        "chess-clock": {"label": "Chess Clock", "styles": ["solidpro"], "unicode": "\uf43d"},
+        "outlet": {"label": "Outlet", "styles": ["solidpro"], "unicode": "\ue01c"},
+    }
+)
+
 
 def fa(name: str, size: int, style: str = "solid") -> tuple[str, ImageFont.FreeTypeFont]:
     icon = _codes.get(name)
@@ -1941,4 +1975,4 @@ def fa(name: str, size: int, style: str = "solid") -> tuple[str, ImageFont.FreeT
     if style not in icon["styles"]:
         style = icon["styles"][0]
 
-    return (icon["unicode"], _fonts[style][size] if size in _fonts[style] else _fonts[style][8])
+    return (icon["unicode"], _fonts[style][size] if size in _fonts[style] else _fonts[style][8])  # type: ignore

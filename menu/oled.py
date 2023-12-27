@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from datetime import datetime
 from typing import Any, Callable, Optional, Union
@@ -12,7 +13,9 @@ from libs.hwinfo import HWInfo
 from libs.timer import TimerMs
 from utils import circular_increment
 
-from .data import MenuItem, ParamType, create_menu_tree
+from .data import Config, MenuItem, ParamType, create_menu_tree
+
+logger = logging.getLogger(__name__)
 
 FONTS = {x: ImageFont.truetype("fonts/better-vcr-5.2.ttf", x) for x in range(4, 33, 2)}
 
@@ -44,7 +47,7 @@ class OledMenu:
         self,
         ameter: Any,  # Replace Any with the appropriate type
         oled: LumaDevice,
-        settingsstorage: Any,  # Replace Any with the appropriate type
+        config: Config,  # Replace Any with the appropriate type
         reset_to_splash_timeout: int = 3000,
     ) -> None:
         """
@@ -54,15 +57,15 @@ class OledMenu:
             ameter: The ameter object.
             oled: The LumaDevice object.
             reset_to_splash_timeout: The timeout for resetting to splash screen.
-            settingsstorage: The settings storage object.
+            config: The config object.
         """
         self._reset_to_splash_timeout = reset_to_splash_timeout
         self._refreshTimer = TimerMs(500, start=True, run_once=False)
         self.ameter = ameter
-        self.settingsstorage = settingsstorage
+        self.config = config
         self.menuLevel = 0
 
-        self.menuItems = create_menu_tree(storage=self.settingsstorage)
+        self.menuItems = create_menu_tree(config=self.config)
         self._oled = oled
         self.draw = canvas(self._oled)
         self.hwinfo = HWInfo()
@@ -172,6 +175,42 @@ class OledMenu:
             for idx, i in enumerate(self._current_menu_position):
                 draw.text((idx * 16, 16), f"{i}", fill="white", font=FONTS[12])
 
+            if self.config.get_value("analog_trigger_enable"):
+                text, font = fa("wave-sine", 8)
+                draw.text((64, 16), text, fill="white", font=font)
+                text, font = fa(
+                    "arrow-up-from-dotted-line"
+                    if self.config.get_value("analog_trigger_direction")
+                    else "arrow-down-from-dotted-line",
+                    8,
+                )
+                draw.text((64 + 16, 16), text, fill="white", font=font)
+
+            if self.config.get_value("digital_trigger_enable"):
+                text, font = fa("wave-square", 8)
+                draw.text((64 + 32, 16), text, fill="white", font=font)
+                text, font = fa(
+                    "arrow-up-from-dotted-line"
+                    if self.config.get_value("digital_trigger_direction")
+                    else "arrow-down-from-dotted-line",
+                    8,
+                )
+                draw.text((64 + 32 + 16, 16), text, fill="white", font=font)
+
+            if self.config.get_value("digital_emmitter_enable"):
+                text, font = fa("signal-stream", 8)
+                draw.text((64, 32), text, fill="white", font=font)
+
+            if self.config.get_value("optron_enable"):
+                text, font = fa("outlet", 8)
+                draw.text((64 + 16, 32), text, fill="white", font=font)
+            if self.config.get_value("oled_blink_enable"):
+                text, font = fa("display", 8)
+                draw.text((64 + 32, 32), text, fill="white", font=font)
+            if self.config.get_value("bt_enable"):
+                text, font = fa("bluetooth-b", 8)
+                draw.text((64 + 32 + 16, 32), text, fill="white", font=font)
+
         # // if (eesettings->analog_trigger_enable){
         # //     int oledLevel = map(ameter->current(), ameter->minVal(), ameter->maxVal(), 0, 64);
         # //     int oledThreshold = map(*(ameter->threshold), ameter->minVal(), ameter->maxVal(), 0, 64);
@@ -190,16 +229,16 @@ class OledMenu:
             margin_x = (self._oled.width - font_16.getlength(self.menuItems[position].title)) / 2
             draw.text(
                 (margin_x, 1),
-                self.menuItems[position].title,
+                self.menuItems[position].get_title(),
                 fill="white",
                 font=font_16,
             )
 
             padding_x = (self._oled.width - len(self.menuItems) * 24) / 2
-            icon_items = [(idx, item) for idx, item in enumerate(self.menuItems) if item.icon]
+            icon_items = [(idx, item) for idx, item in enumerate(self.menuItems) if item.get_icon()]
 
             for idx, item in icon_items:
-                text, font = fa(item.icon, 16)
+                text, font = fa(item.get_icon(), 16)
                 draw.text((idx * 24 + padding_x + 6, 32 + 4), text, fill="white", font=font)
 
                 if idx == position:
@@ -217,26 +256,35 @@ class OledMenu:
     def draw_submenu_screen(self, parent_position: int, position: int) -> None:
         current_item = self.menuItems[parent_position].children[position]
 
-        with canvas(self._oled) as draw:
-            draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
+        try:
+            with canvas(self._oled) as draw:
+                draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
 
-            font_16 = FONTS[16]
-            draw.text((0, 0), current_item.title, fill="white", font=font_16)
+                font_16 = FONTS[16]
+                draw.text((0, 0), current_item.get_title(), fill="white", font=font_16)
 
-            if current_item.type == ParamType.EXIT:
-                return
+                if current_item.get_icon():
+                    text, font = fa(current_item.get_icon(), 24)
+                    draw.text((0, 40), text, fill="white", font=font)
 
-            if current_item.type == ParamType.BOOL:
-                text = "True" if current_item.value else "False"
+                param_type = current_item.get_param_type()
 
-            if current_item.type == ParamType.INT:
-                text = str(current_item.value)
+                if param_type in (ParamType.EXIT, ParamType.FOLDER):
+                    return
 
-            if current_item.type == ParamType.FLOAT:
-                text = f"{current_item.value:.2f}"
+                if param_type == ParamType.BOOL:
+                    text = "True" if current_item.config_item.value else "False"
 
-            x = self._oled.width - font_16.getlength(text)
-            draw.text((x, 48), text, fill="white", font=font_16)
+                if param_type == ParamType.INT:
+                    text = str(current_item.config_item.value)
+
+                if param_type == ParamType.FLOAT:
+                    text = f"{current_item.config_item.value:.2f}"
+
+                x = self._oled.width - font_16.getlength(text)
+                draw.text((x, 48), text, fill="white", font=font_16)
+        except Exception as e:
+            logger.exception(e)
 
     async def tick(self) -> None:
         # print("oled tick")
@@ -284,13 +332,15 @@ class OledMenu:
                 self._current_menu_position[self.menuLevel]
             ]
 
-            if current_item.type == ParamType.EXIT:
+            param_type = current_item.get_param_type()
+
+            if param_type == ParamType.EXIT:
                 self.menuLevel = 1
                 self.draw_menu_screen(self._current_menu_position[self.menuLevel])
                 self._splashscreen_timer_start()
                 return
 
-            if current_item.type in (ParamType.BOOL, ParamType.INT, ParamType.FLOAT):
+            if param_type in (ParamType.BOOL, ParamType.INT, ParamType.FLOAT):
                 self._edit_precision = 0
                 self.menuLevel = 3
                 draw_item_editor(self._oled, current_item, self._edit_precision)
@@ -316,7 +366,7 @@ class OledMenu:
                 current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
                     self._current_menu_position[self.menuLevel - 1]
                 ]
-                if current_item.type in (
+                if current_item.get_param_type() in (
                     ParamType.BOOL,
                     ParamType.INT,
                     ParamType.FLOAT,
@@ -345,26 +395,28 @@ class OledMenu:
                 self._current_menu_position[self.menuLevel - 1]
             ]
 
-            if current_item.type == ParamType.EXIT:
+            param_type = current_item.get_param_type()
+
+            if param_type == ParamType.EXIT:
                 return
 
-            if current_item.type == ParamType.BOOL:
-                print(f"Here we rotate {current_item.title}")
-                current_item.value = not current_item.value
+            if param_type == ParamType.BOOL:
+                print(f"Here we rotate {current_item.get_title()} with {current_item.config_item.value}")
+                current_item.config_item.value = not current_item.config_item.value
                 draw_item_editor(self._oled, current_item, 0)
                 return
 
             delta: Union[int, float] = 0
 
-            if current_item.type == ParamType.INT:
+            if param_type == ParamType.INT:
                 delta = int_delta(direction, self._edit_precision)
-                current_item.value = current_item.value + delta
+                current_item.config_item.value = current_item.config_item.value + delta
                 draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
-            if current_item.type == ParamType.FLOAT:
+            if param_type == ParamType.FLOAT:
                 delta = float_delta(direction, self._edit_precision)
-                current_item.value = current_item.value + delta
+                current_item.config_item.value = current_item.config_item.value + delta
                 draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
@@ -400,16 +452,18 @@ def draw_item_editor(screen: LumaDevice, item: MenuItem, precision: int = 0) -> 
         font_16 = FONTS[16]
         draw.rectangle(screen.bounding_box, outline="black", fill="black")
 
-        draw.text((0, 0), item.title, fill="white", font=font_16)
+        draw.text((0, 0), item.get_title(), fill="white", font=font_16)
 
-        if item.type == ParamType.BOOL:
-            text = "True" if item.value else "False"
+        param_type = item.get_param_type()
 
-        if item.type == ParamType.INT:
-            text = str(item.value)
+        if param_type == ParamType.BOOL:
+            text = "True" if item.config_item.value else "False"
 
-        if item.type == ParamType.FLOAT:
-            text = f"{item.value:.2f}"
+        if param_type == ParamType.INT:
+            text = str(item.config_item.value)
+
+        if param_type == ParamType.FLOAT:
+            text = f"{item.config_item.value:.2f}"
 
         x = screen.width - font_16.getlength(text)
         letter_width = font_16.getlength("0")

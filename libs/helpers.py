@@ -4,7 +4,7 @@ import logging
 import signal
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from typing import Any, Optional
 
 
 async def shutdown(
@@ -33,7 +33,7 @@ async def shutdown(
     loop.stop()
 
 
-def handle_exception(executor: ThreadPoolExecutor, loop: asyncio.AbstractEventLoop, context: dict) -> None:
+def handle_exception(executor: ThreadPoolExecutor, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
     # context["message"] will always be there; but context["exception"] may not
     msg = context.get("exception", context["message"])
     logging.error(f"Caught exception: {msg}")
