@@ -1,5 +1,3 @@
-import dbm
-
 from enum import Enum
 from typing import Any, Optional
 
@@ -64,7 +62,7 @@ class MenuItem:
             print(e)
 
 
-def create_menu_tree(storage: dbm._Database) -> list[MenuItem]:
+def create_menu_tree(storage: Any) -> list[MenuItem]:
     exit_item = MenuItem("Exit", ParamType.EXIT, storage)
 
     return [
@@ -72,7 +70,7 @@ def create_menu_tree(storage: dbm._Database) -> list[MenuItem]:
             "Trigger",
             ParamType.FOLDER,
             storage,
-            icon="bell-ring-outline-custom",
+            icon="bell",
             children=[
                 MenuItem("A.Enable", ParamType.BOOL, storage, default_value=False),
                 MenuItem("AThreshold", ParamType.INT, storage, default_value=200),
@@ -87,14 +85,14 @@ def create_menu_tree(storage: dbm._Database) -> list[MenuItem]:
             "Timer",
             ParamType.FOLDER,
             storage,
-            icon="timer-outline-custom",
+            icon="stopwatch",
             children=[exit_item],
         ),
         MenuItem(
             "Settings",
             ParamType.FOLDER,
             storage,
-            icon="hammer-wrench-custom",
+            icon="screwdriver-wrench",
             children=[
                 MenuItem("Shut.Delay", ParamType.INT, storage, default_value=0),
                 MenuItem("Relz.Delay", ParamType.INT, storage, default_value=60),
@@ -108,7 +106,7 @@ def create_menu_tree(storage: dbm._Database) -> list[MenuItem]:
             "Bluetooth",
             ParamType.FOLDER,
             storage,
-            icon="bluetooth-custom",
+            icon="bluetooth",
             children=[
                 MenuItem("Enable BT", ParamType.BOOL, storage, default_value=False),
                 exit_item,

@@ -43,9 +43,9 @@ class Button:
         self.is_pressed = False
 
         self.loop = asyncio.get_event_loop()
-        self.timer = RepeatTimer(0.05, self.tick)
 
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        self.timer = RepeatTimer(0.05, self.tick)
 
         self.timer.start()
 
@@ -67,6 +67,7 @@ class Button:
             if new_state == KEY_DOWN:
                 self.is_pressed = True
                 if self.callback is not None:
+                    # https://raspberrypi.stackexchange.com/questions/54514/implement-a-gpio-function-with-a-callback-calling-a-asyncio-method
                     asyncio.run_coroutine_threadsafe(
                         self.callback("press", self.pin),
                         loop=self.loop,

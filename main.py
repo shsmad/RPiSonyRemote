@@ -1,13 +1,22 @@
 import asyncio
 import dbm
+import functools
 import logging
+import signal
 import sys
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import RPi.GPIO as GPIO
 
-logging.basicConfig(level=logging.DEBUG)
+from libs.helpers import handle_exception, shutdown
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 
 # define EB_HOLD 500
@@ -26,6 +35,7 @@ logging.basicConfig(level=logging.DEBUG)
 # include "ble/RemoteStatus.h"
 # include "ble/BLEScanner.h"
 # include "ble/BLECamera.h"
+
 
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
@@ -109,15 +119,33 @@ def setup() -> None:
     oled_menu.init()
 
 
-setup()
+def main() -> None:
+    executor = ThreadPoolExecutor()
 
-try:
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_forever()
-except Exception:
-    print("Error:", sys.exc_info()[0])
-finally:
-    for button in (btn_left, btn_right, btn_press):
-        button.cleanup()
-    loop.close()
+    loop.slow_callback_duration = 0.2  # in seconds
+    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+    for s in signals:
+        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(shutdown(loop, executor, signal=s)))
+
+    handle_exc_func = functools.partial(handle_exception, executor)
+
+    loop.set_exception_handler(handle_exc_func)
+
+    setup()
+    try:
+        loop.create_task(oled_menu.tick())
+        loop.run_forever()
+
+    except Exception:
+        print("Error:", sys.exc_info()[0])
+    finally:
+        for button in (btn_left, btn_right, btn_press):
+            button.cleanup()
+        loop.close()
+        logging.info("Successfully shutdown the RPiSonyRemote service.")
+
+
+if __name__ == "__main__":
+    main()
