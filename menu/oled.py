@@ -36,12 +36,31 @@ async def process_timer(interval: int, callback: Callable[[], None]) -> None:
         callback()
 
 
+class TaskTimer:
+    def __init__(self, interval: int, callback: Callable[[], None]) -> None:
+        self.interval = interval
+        self.callback = callback
+        self.task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        if self.task:
+            self.task.cancel()
+
+        self.task = asyncio.create_task(process_timer(self.interval, self.callback))
+
+    def stop(self) -> None:
+        if self.task:
+            self.task.cancel()
+            self.task = None
+
+    def __repr__(self) -> str:
+        return f"TaskTimer(interval={self.interval}, callback={self.callback})"
+
+
 class OledMenu:
     _current_menu_position = [0, 0, 0]
     _edit_precision = 0
     # AnalogInputDevice *ameter;
-    _t_reset_to_splashscreen: Optional[asyncio.Task] = None
-    _t_update_hwinfo: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -69,6 +88,9 @@ class OledMenu:
         self._oled = oled
         self.draw = canvas(self._oled)
         self.hwinfo = HWInfo()
+
+        self._t_reset_to_splashscreen = TaskTimer(interval=reset_to_splash_timeout, callback=self.reset_to_splashscreen)
+        self._t_update_hwinfo = TaskTimer(interval=1000, callback=self.update_hwinfo)
 
     def init(self) -> None:
         """
@@ -102,69 +124,6 @@ class OledMenu:
                     draw.text((0, 57), data["ip"], font=FONTS[8], fill=255)
             except Exception as e:
                 print(e)
-
-        self._hwinfo_timer_stop()
-        self._hwinfo_timer_start()
-
-    def _hwinfo_timer_start(self) -> None:
-        """
-        Start the hardware info timer.
-
-        Args:
-            self: The instance of the class.
-
-        Returns:
-            None
-        """
-        if self._t_update_hwinfo:
-            self._t_update_hwinfo.cancel()
-
-        self._t_update_hwinfo = asyncio.create_task(process_timer(100, self.update_hwinfo))
-
-    def _hwinfo_timer_stop(self) -> None:
-        """
-        Stop the hardware info timer.
-
-        Args:
-            self: The instance of the class.
-
-        Returns:
-            None
-        """
-        if self._t_update_hwinfo:
-            self._t_update_hwinfo.cancel()
-            self._t_update_hwinfo = None
-
-    def _splashscreen_timer_start(self) -> None:
-        """
-        Start the splashscreen timer.
-
-        Args:
-            self: The instance of the class.
-
-        Returns:
-            None
-        """
-        if self._t_reset_to_splashscreen:
-            self._t_reset_to_splashscreen.cancel()
-
-        self._t_reset_to_splashscreen = asyncio.create_task(
-            process_timer(self._reset_to_splash_timeout, self.reset_to_splashscreen)
-        )
-
-    def _splashscreen_timer_stop(self) -> None:
-        """
-        Stop the splash screen timer.
-
-        Args:
-            self: The instance of the class.
-
-        Returns:
-            None
-        """
-        if self._t_reset_to_splashscreen:
-            self._t_reset_to_splashscreen.cancel()
-            self._t_reset_to_splashscreen = None
 
     def draw_splash_screen(self) -> None:
         now = datetime.now().strftime("%H:%M:%S")
@@ -287,8 +246,8 @@ class OledMenu:
             logger.exception(e)
 
     async def tick(self) -> None:
-        # print("oled tick")
-        self._hwinfo_timer_start()
+        print("oled tick")
+        self._t_update_hwinfo.start()
         # if not self._refreshTimer.tick():
         #     return
 
@@ -300,7 +259,7 @@ class OledMenu:
         # };
 
     def reset_to_splashscreen(self) -> None:
-        self._splashscreen_timer_stop()
+        self._t_reset_to_splashscreen.stop()
         self.menuLevel = 0
         self.draw_splash_screen()
 
@@ -319,7 +278,7 @@ class OledMenu:
 
         if self.menuLevel == 1:
             self.menuLevel = 2
-            self._splashscreen_timer_stop()
+            self._t_reset_to_splashscreen.stop()
             self._current_menu_position[self.menuLevel] = 0
             self.draw_submenu_screen(
                 self._current_menu_position[self.menuLevel - 1],
@@ -337,7 +296,7 @@ class OledMenu:
             if param_type == ParamType.EXIT:
                 self.menuLevel = 1
                 self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-                self._splashscreen_timer_start()
+                self._t_reset_to_splashscreen.start()
                 return
 
             if param_type in (ParamType.BOOL, ParamType.INT, ParamType.FLOAT):
@@ -357,7 +316,7 @@ class OledMenu:
     def on_key_press_splashscreen(self) -> None:
         self.menuLevel = 1
         self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-        self._splashscreen_timer_start()
+        self._t_reset_to_splashscreen.start()
 
     def onKeyClickAfterHold(self, pin: int, steps: int, hold: int) -> None:
         if self.menuLevel == 3:
@@ -422,7 +381,7 @@ class OledMenu:
 
         if self.menuLevel == 1:
             self.draw_menu_screen(self._current_menu_position[self.menuLevel])
-            self._splashscreen_timer_start()
+            self._t_reset_to_splashscreen.start()
             return
 
         if self.menuLevel == 2:
