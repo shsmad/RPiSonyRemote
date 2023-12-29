@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from datetime import datetime
 from typing import Any, Callable, Optional, Union
@@ -96,6 +97,10 @@ class OledMenu:
         """
         Initializes the object and draws the splash screen.
         """
+        self._oled.contrast(255)
+        self.draw_splash_screen()
+        time.sleep(1)
+        self._oled.contrast(10)
         self.draw_splash_screen()
 
     def update_hwinfo(self) -> None:
@@ -115,9 +120,10 @@ class OledMenu:
             try:
                 with self.draw as draw:
                     draw.rectangle((0, 47, self._oled.width, self._oled.height), outline="black", fill="black")
+                    charge_sign = "+" if data["is_charging"] else "-"
                     draw.text(
                         (0, 48),
-                        f"C{data['cpu']:2d} M{data['memory']:2d} V{data['voltage']:3.1f} {data['capacity']:2d}% {data['temperature']:2d}℃",
+                        f"C{data['cpu']:2d} M{data['memory']:2d} V{data['voltage']:3.1f}{charge_sign}{data['capacity']:2d}% {data['temperature']:2d}℃",
                         font=FONTS[8],
                         fill=255,
                     )
