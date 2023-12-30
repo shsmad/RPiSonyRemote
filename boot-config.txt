@@ -1,0 +1,6 @@
+dtparam=i2c_arm=on,i2c_baudrate=400000
+dtparam=spi=on
+dtparam=audio=on
+dtparam=act_led_trigger=gpio
+dtparam=act_led_activelow=on
+dtparam=act_led_gpio=29
