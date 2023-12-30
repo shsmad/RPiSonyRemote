@@ -117,9 +117,9 @@ def get_config(storage: Any) -> Config:
     config.add_option("digital_trigger_enable", "D.Enable", ParamType.BOOL, True, "wave-square")
     config.add_option("digital_trigger_direction", "D.Above", ParamType.BOOL, True, "arrow-up-from-dotted-line")
     config.add_option("digital_emmitter_enable", "Emmitter", ParamType.BOOL, False, "signal-stream")
-    config.add_option("trigger_lag", "Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
 
-    config.add_option("shutter_release_time", "Relz.Delay", ParamType.INT, 60, "chess-clock")
+    config.add_option("shutter_lag", "Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
+    config.add_option("release_lag", "Relz.Delay", ParamType.INT, 60, "chess-clock")
     config.add_option("optron_enable", "Optron Out", ParamType.BOOL, True, "outlet")
     config.add_option("oled_blink_enable", "Blink Out", ParamType.BOOL, True, "display")
     config.add_option("trigger_read_timer", "ReadTimer", ParamType.INT, 60, "clock")
@@ -157,8 +157,8 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
             "Settings",
             icon="screwdriver-wrench",
             children=[
-                MenuItem(config_item=config.get_option("trigger_lag")),
-                MenuItem(config_item=config.get_option("shutter_release_time")),
+                MenuItem(config_item=config.get_option("shutter_lag")),
+                MenuItem(config_item=config.get_option("release_lag")),
                 MenuItem(config_item=config.get_option("optron_enable")),
                 MenuItem(config_item=config.get_option("oled_blink_enable")),
                 MenuItem(config_item=config.get_option("trigger_read_timer")),

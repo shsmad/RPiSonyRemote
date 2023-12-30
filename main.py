@@ -14,6 +14,8 @@ from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 
 from libs.button import Button
+from libs.device.input import DigitalInputDevice, IDeviceTriggerMode
+from libs.device.output import LedOutputDevice, ScreenOutputDevice
 from libs.helpers import handle_exception, shutdown
 from libs.router import Router
 from menu.data import get_config
@@ -54,7 +56,35 @@ config = get_config(storage)
 
 oled_menu = OledMenu(None, oled=device, config=config)
 
-router = Router([], [])
+router = Router(
+    [
+        DigitalInputDevice(
+            22,
+            mode=IDeviceTriggerMode.ABOVE_THRESHOLD
+            if config.get_value("digital_trigger_direction")
+            else IDeviceTriggerMode.BELOW_THRESHOLD,
+            enabled=config.get_value("digital_trigger_enable"),
+            bouncetime=config.get_value("trigger_read_timer"),
+        )
+    ],
+    [
+        # ConsoleOutputDevice(
+        #     shutter_lag=config.get_value("shutter_lag"),
+        #     release_lag=config.get_value("release_lag"),
+        # ),
+        ScreenOutputDevice(
+            canvas=oled_menu.draw,
+            shutter_lag=config.get_value("shutter_lag"),
+            release_lag=config.get_value("release_lag"),
+        ),
+        LedOutputDevice(
+            pin=29,
+            shutter_lag=config.get_value("shutter_lag"),
+            release_lag=config.get_value("release_lag"),
+        ),
+    ],
+    config,
+)
 
 
 async def on_btn_left(event_type: str, *args: Any) -> None:
@@ -115,7 +145,6 @@ btn_press = Button(13, callback=on_btn_press)
 
 
 def setup() -> None:
-    router.init()
     oled_menu.init()
 
 

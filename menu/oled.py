@@ -137,9 +137,6 @@ class OledMenu:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
             draw.text((0, 1), f"RPiRemote {now}", fill="white", font=FONTS[8])
 
-            for idx, i in enumerate(self._current_menu_position):
-                draw.text((idx * 16, 16), f"{i}", fill="white", font=FONTS[12])
-
             if self.config.get_value("analog_trigger_enable"):
                 text, font = fa("wave-sine", 8)
                 draw.text((64, 16), text, fill="white", font=font)

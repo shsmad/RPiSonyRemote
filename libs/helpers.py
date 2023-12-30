@@ -36,6 +36,6 @@ async def shutdown(
 def handle_exception(executor: ThreadPoolExecutor, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
     # context["message"] will always be there; but context["exception"] may not
     msg = context.get("exception", context["message"])
-    logging.error(f"Caught exception: {msg}")
+    logging.exception(f"Caught exception: {msg}\n\t{context}")
     logging.info("Shutting down...")
     asyncio.create_task(shutdown(loop, executor))
