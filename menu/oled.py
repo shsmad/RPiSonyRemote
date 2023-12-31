@@ -137,39 +137,39 @@ class OledMenu:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
             draw.text((0, 1), f"RPiRemote {now}", fill="white", font=FONTS[8])
 
-            if self.config.get_value("analog_trigger_enable"):
+            if self.config.analog_trigger_enable.value:
                 text, font = fa("wave-sine", 8)
                 draw.text((64, 16), text, fill="white", font=font)
                 text, font = fa(
                     "arrow-up-from-dotted-line"
-                    if self.config.get_value("analog_trigger_direction")
+                    if self.config.analog_trigger_direction.value
                     else "arrow-down-from-dotted-line",
                     8,
                 )
                 draw.text((64 + 16, 16), text, fill="white", font=font)
 
-            if self.config.get_value("digital_trigger_enable"):
+            if self.config.digital_trigger_enable.value:
                 text, font = fa("wave-square", 8)
                 draw.text((64 + 32, 16), text, fill="white", font=font)
                 text, font = fa(
                     "arrow-up-from-dotted-line"
-                    if self.config.get_value("digital_trigger_direction")
+                    if self.config.digital_trigger_direction.value
                     else "arrow-down-from-dotted-line",
                     8,
                 )
                 draw.text((64 + 32 + 16, 16), text, fill="white", font=font)
 
-            if self.config.get_value("digital_emmitter_enable"):
+            if self.config.digital_emmitter_enable.value:
                 text, font = fa("signal-stream", 8)
                 draw.text((64, 32), text, fill="white", font=font)
 
-            if self.config.get_value("optron_enable"):
+            if self.config.optron_enable.value:
                 text, font = fa("outlet", 8)
                 draw.text((64 + 16, 32), text, fill="white", font=font)
-            if self.config.get_value("oled_blink_enable"):
+            if self.config.oled_blink_enable.value:
                 text, font = fa("display", 8)
                 draw.text((64 + 32, 32), text, fill="white", font=font)
-            if self.config.get_value("bt_enable"):
+            if self.config.bt_enable.value:
                 text, font = fa("bluetooth-b", 8)
                 draw.text((64 + 32 + 16, 32), text, fill="white", font=font)
 

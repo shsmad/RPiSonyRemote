@@ -6,6 +6,8 @@ from typing import Any
 
 import RPi.GPIO as GPIO
 
+from menu.data import Config
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,11 +19,12 @@ class IDeviceTriggerMode(Enum):
 class InputDevice:
     _last_value = 0
     notify_callback = None  # async func
+    mode: IDeviceTriggerMode = IDeviceTriggerMode.ABOVE_THRESHOLD
+    enabled: bool = False
+    bouncetime: int = 0
 
-    def __init__(self, mode: IDeviceTriggerMode, enabled: bool, bouncetime: int):
-        self.mode = mode
-        self.enabled = enabled
-        self.bouncetime = bouncetime
+    def __init__(self, config: Config):
+        self.config = config
 
     def set_notify_callback(self, callback: Any) -> None:
         self.notify_callback = callback
@@ -31,8 +34,8 @@ class InputDevice:
 
 
 class GPIODevice(InputDevice):
-    def __init__(self, pin: int, mode: IDeviceTriggerMode, enabled: bool, bouncetime: int):
-        super().__init__(mode, enabled, bouncetime)
+    def __init__(self, config: Config, pin: int):
+        super().__init__(config)
 
         self.loop = asyncio.get_event_loop()
         self.pin = pin
@@ -45,9 +48,16 @@ class GPIODevice(InputDevice):
 
 
 class DigitalInputDevice(GPIODevice):
-    def __init__(self, pin: int, mode: IDeviceTriggerMode, enabled: bool, bouncetime: int):
-        super().__init__(pin, mode, enabled, bouncetime)
+    def __init__(self, config: Config, pin: int):
+        super().__init__(config, pin)
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        self.mode = (
+            IDeviceTriggerMode.ABOVE_THRESHOLD
+            if config.digital_trigger_direction.value
+            else IDeviceTriggerMode.BELOW_THRESHOLD
+        )
+        self.enabled = config.digital_trigger_enable.value
+        self.bouncetime = config.trigger_read_timer.value
 
     def callback(self, channel: int) -> None:
         if not self.enabled and self.notify_callback is None:

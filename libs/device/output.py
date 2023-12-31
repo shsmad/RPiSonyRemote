@@ -12,16 +12,27 @@ from luma.core.render import canvas as Canvas
 
 from libs.ble.utils import F_ACQUIRED, F_LOST, S_ACTIVE, S_READY, SFD, SFU, SHD, SHU, get_sony_device
 from libs.fontawesome import fa
+from menu.data import Config
 
 logger = logging.getLogger(__name__)
 
 
 class OutputDevice:
-    def __init__(self, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
-        self.shutter_lag = shutter_lag
-        self.release_lag = release_lag
-        self.enabled = enabled
+    def __init__(self, config: Config):
+        self.config = config
         self.can_release = True
+
+    @property
+    def shutter_lag(self) -> int:
+        return self.config.shutter_lag.value
+
+    @property
+    def release_lag(self) -> int:
+        return self.config.release_lag.value
+
+    @property
+    def enabled(self) -> bool:
+        return False
 
     async def shutter(self) -> None:
         pass
@@ -31,8 +42,8 @@ class OutputDevice:
 
 
 class ConsoleOutputDevice(OutputDevice):
-    def __init__(self, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
-        super().__init__(shutter_lag, release_lag, enabled)
+    def __init__(self, config: Config):
+        super().__init__(config)
 
     async def shutter(self) -> None:
         self.can_release = False
@@ -50,9 +61,13 @@ class ConsoleOutputDevice(OutputDevice):
 
 
 class ScreenOutputDevice(OutputDevice):
-    def __init__(self, canvas: Canvas, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
-        super().__init__(shutter_lag, release_lag, enabled)
+    def __init__(self, config: Config, canvas: Canvas):
+        super().__init__(config)
         self.draw = canvas
+
+    @property
+    def enabled(self) -> bool:
+        return self.config.oled_blink_enable.value
 
     async def shutter(self) -> None:
         self.can_release = False
@@ -82,13 +97,15 @@ class ScreenOutputDevice(OutputDevice):
 
 
 class PinOutputDevice(OutputDevice):
-    def __init__(
-        self, pin: int = 29, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True, inverted: bool = False
-    ):
-        super().__init__(shutter_lag, release_lag, enabled)
+    def __init__(self, config: Config, pin: int = 29, inverted: bool = False):
+        super().__init__(config)
         self.pin = pin
         self.inverted = inverted
         GPIO.setup(pin, GPIO.OUT)
+
+    @property
+    def enabled(self) -> bool:
+        return self.config.led_blink_enable.value
 
     async def shutter(self) -> None:
         self.can_release = False
@@ -108,8 +125,8 @@ class PinOutputDevice(OutputDevice):
 
 
 class BluetoothOuputDevice(OutputDevice):
-    def __init__(self, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
-        super().__init__(shutter_lag, release_lag, enabled)
+    def __init__(self, config: Config):
+        super().__init__(config)
         self.device: Optional[Union[str, BLEDevice]] = None
         self.client: Optional[BleakClient] = None
         self.command_handle = None
@@ -117,6 +134,10 @@ class BluetoothOuputDevice(OutputDevice):
         self.af_enabled = False
         self._focus_acquired = False
         self._shutter_active = False
+
+    @property
+    def enabled(self) -> bool:
+        return self.config.bt_enable.value
 
     def notification_handler(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
         logger.info("BLE notification_handler %s: %r", characteristic, data)
@@ -138,7 +159,6 @@ class BluetoothOuputDevice(OutputDevice):
             logger.debug(f"Connected: {self.client.is_connected}")
 
             for service in self.client.services:
-                print(service.uuid)
                 if service.uuid.lower() != "8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF".lower():
                     continue
 

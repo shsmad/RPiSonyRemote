@@ -14,25 +14,26 @@ class ParamType(Enum):
     FOLDER = 4
 
 
+class FieldMeta(type):
+    def __init__(self, name: str, bases: tuple, attrs: dict[str, Any]) -> None:
+        print(f"FieldMeta: name={name}, bases={bases}, attrs={attrs}")
+        for attr_name, attr_value in attrs.items():
+            if isinstance(attr_value, ConfigItem):
+                attr_value.key = attr_name
+
+
 class ConfigItem:
-    def __init__(
-        self,
-        storage: Any,
-        key: str,
-        title: str,
-        param_type: ParamType,
-        default_value: Any,
-        icon: Optional[str] = None,
-    ):
-        self.storage = storage
-        self.key = key
+    def __init__(self, title: str, param_type: ParamType, default_value: Any, icon: Optional[str] = None) -> None:
+        self.key: Optional[str] = None
         self.title = title
         self.param_type = param_type
         self.default_value = default_value
         self.icon = icon
+        self.storage: Any = None
 
     @property
     def value(self) -> Any:
+        print(self.storage)
         try:
             from_db = self.storage.get(self.key)
             if from_db is None:
@@ -64,24 +65,30 @@ class ConfigItem:
             logger.exception(e)
 
 
-class Config:
+class Config(metaclass=FieldMeta):
+    analog_trigger_enable = ConfigItem("A.Enable", ParamType.BOOL, False, "wave-sine")
+    analog_trigger_threshold = ConfigItem("A.Barrier", ParamType.INT, 200, "dial")
+    analog_trigger_direction = ConfigItem("A.Above", ParamType.BOOL, False, "arrow-up-from-dotted-line")
+    digital_trigger_enable = ConfigItem("D.Enable", ParamType.BOOL, True, "wave-square")
+    digital_trigger_direction = ConfigItem("D.Above", ParamType.BOOL, True, "arrow-up-from-dotted-line")
+    digital_emmitter_enable = ConfigItem("Emmitter", ParamType.BOOL, False, "signal-stream")
+
+    shutter_lag = ConfigItem("Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
+    release_lag = ConfigItem("Relz.Delay", ParamType.INT, 60, "chess-clock")
+    optron_enable = ConfigItem("Optron Out", ParamType.BOOL, True, "outlet")
+    oled_blink_enable = ConfigItem("Blink Screen", ParamType.BOOL, True, "display")
+    led_blink_enable = ConfigItem("Blink LED", ParamType.BOOL, True, "lightbulb")
+    trigger_read_timer = ConfigItem("ReadTimer", ParamType.INT, 60, "clock")
+
+    bt_enable = ConfigItem("Enable BT", ParamType.BOOL, False, "bluetooth-b")
+    bt_bulb = ConfigItem("BULB mode", ParamType.BOOL, False, "hand-point-down")
+    bt_af_enable = ConfigItem("Enable AF", ParamType.BOOL, False, "users-viewfinder")
+
     def __init__(self, storage: Any):
         self.storage = storage
-        self.options: dict[str, ConfigItem] = {}
-
-    def add_option(
-        self, key: str, title: str, param_type: ParamType, default_value: Any, icon: Optional[str] = None
-    ) -> None:
-        self.options[key] = ConfigItem(self.storage, key, title, param_type, default_value, icon)
-
-    def get_option(self, key: str) -> ConfigItem:
-        return self.options[key]
-
-    def get_value(self, key: str) -> Any:
-        return self.options[key].value
-
-    def set_value(self, key: str, value: Any) -> None:
-        self.options[key].value = value
+        for x in dir(self):
+            if isinstance(getattr(self, x), ConfigItem):
+                getattr(self, x).storage = self.storage
 
 
 class MenuItem:
@@ -110,26 +117,7 @@ class MenuItem:
 
 
 def get_config(storage: Any) -> Config:
-    config = Config(storage)
-    config.add_option("analog_trigger_enable", "A.Enable", ParamType.BOOL, False, "wave-sine")
-    config.add_option("analog_trigger_threshold", "AThreshold", ParamType.INT, 200, "dial")
-    config.add_option("analog_trigger_direction", "A.Above", ParamType.BOOL, False, "arrow-up-from-dotted-line")
-    config.add_option("digital_trigger_enable", "D.Enable", ParamType.BOOL, True, "wave-square")
-    config.add_option("digital_trigger_direction", "D.Above", ParamType.BOOL, True, "arrow-up-from-dotted-line")
-    config.add_option("digital_emmitter_enable", "Emmitter", ParamType.BOOL, False, "signal-stream")
-
-    config.add_option("shutter_lag", "Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
-    config.add_option("release_lag", "Relz.Delay", ParamType.INT, 60, "chess-clock")
-    config.add_option("optron_enable", "Optron Out", ParamType.BOOL, True, "outlet")
-    config.add_option("oled_blink_enable", "Blink Screen", ParamType.BOOL, True, "display")
-    config.add_option("led_blink_enable", "Blink LED", ParamType.BOOL, True, "lightbulb")
-    config.add_option("trigger_read_timer", "ReadTimer", ParamType.INT, 60, "clock")
-
-    config.add_option("bt_enable", "Enable BT", ParamType.BOOL, False, "bluetooth-b")
-    config.add_option("bt_bulb", "BULB mode", ParamType.BOOL, False, "hand-point-down")
-    config.add_option("bt_af_enable", "Enable AF", ParamType.BOOL, False, "users-viewfinder")
-
-    return config
+    return Config(storage)
 
 
 def create_menu_tree(config: Config) -> list[MenuItem]:
@@ -140,12 +128,12 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
             "Trigger",
             icon="bell",
             children=[
-                MenuItem(config_item=config.get_option("analog_trigger_enable")),
-                MenuItem(config_item=config.get_option("analog_trigger_threshold")),
-                MenuItem(config_item=config.get_option("analog_trigger_direction")),
-                MenuItem(config_item=config.get_option("digital_trigger_enable")),
-                MenuItem(config_item=config.get_option("digital_trigger_direction")),
-                MenuItem(config_item=config.get_option("digital_emmitter_enable")),
+                MenuItem(config_item=config.analog_trigger_enable),
+                MenuItem(config_item=config.analog_trigger_threshold),
+                MenuItem(config_item=config.analog_trigger_direction),
+                MenuItem(config_item=config.digital_trigger_enable),
+                MenuItem(config_item=config.digital_trigger_direction),
+                MenuItem(config_item=config.digital_emmitter_enable),
                 exit_item,
             ],
         ),
@@ -160,12 +148,12 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
             "Settings",
             icon="screwdriver-wrench",
             children=[
-                MenuItem(config_item=config.get_option("shutter_lag")),
-                MenuItem(config_item=config.get_option("release_lag")),
-                MenuItem(config_item=config.get_option("optron_enable")),
-                MenuItem(config_item=config.get_option("oled_blink_enable")),
-                MenuItem(config_item=config.get_option("led_blink_enable")),
-                MenuItem(config_item=config.get_option("trigger_read_timer")),
+                MenuItem(config_item=config.shutter_lag),
+                MenuItem(config_item=config.release_lag),
+                MenuItem(config_item=config.optron_enable),
+                MenuItem(config_item=config.oled_blink_enable),
+                MenuItem(config_item=config.led_blink_enable),
+                MenuItem(config_item=config.trigger_read_timer),
                 exit_item,
             ],
         ),
@@ -174,9 +162,9 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
             "Bluetooth",
             icon="bluetooth",
             children=[
-                MenuItem(config_item=config.get_option("bt_enable")),
-                MenuItem(config_item=config.get_option("bt_bulb")),
-                MenuItem(config_item=config.get_option("bt_af_enable")),
+                MenuItem(config_item=config.bt_enable),
+                MenuItem(config_item=config.bt_bulb),
+                MenuItem(config_item=config.bt_af_enable),
                 exit_item,
             ],
         ),

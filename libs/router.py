@@ -1,14 +1,12 @@
 import asyncio
 
-from menu.data import Config
-
 from .device.input import GPIODevice
 from .device.output import OutputDevice
 from .timer import TimerMs
 
 
 class Router:
-    def __init__(self, input_devices: list[GPIODevice], output_devices: list[OutputDevice], config: Config) -> None:
+    def __init__(self, input_devices: list[GPIODevice], output_devices: list[OutputDevice]) -> None:
         self.timer = TimerMs(10, 0, 0)
         self.input_devices = input_devices
         self.output_devices = output_devices
