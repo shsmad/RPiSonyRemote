@@ -121,10 +121,13 @@ def get_config(storage: Any) -> Config:
     config.add_option("shutter_lag", "Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
     config.add_option("release_lag", "Relz.Delay", ParamType.INT, 60, "chess-clock")
     config.add_option("optron_enable", "Optron Out", ParamType.BOOL, True, "outlet")
-    config.add_option("oled_blink_enable", "Blink Out", ParamType.BOOL, True, "display")
+    config.add_option("oled_blink_enable", "Blink Screen", ParamType.BOOL, True, "display")
+    config.add_option("led_blink_enable", "Blink LED", ParamType.BOOL, True, "lightbulb")
     config.add_option("trigger_read_timer", "ReadTimer", ParamType.INT, 60, "clock")
 
     config.add_option("bt_enable", "Enable BT", ParamType.BOOL, False, "bluetooth-b")
+    config.add_option("bt_bulb", "BULB mode", ParamType.BOOL, False, "hand-point-down")
+    config.add_option("bt_af_enable", "Enable AF", ParamType.BOOL, False, "users-viewfinder")
 
     return config
 
@@ -161,6 +164,7 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
                 MenuItem(config_item=config.get_option("release_lag")),
                 MenuItem(config_item=config.get_option("optron_enable")),
                 MenuItem(config_item=config.get_option("oled_blink_enable")),
+                MenuItem(config_item=config.get_option("led_blink_enable")),
                 MenuItem(config_item=config.get_option("trigger_read_timer")),
                 exit_item,
             ],
@@ -171,6 +175,8 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
             icon="bluetooth",
             children=[
                 MenuItem(config_item=config.get_option("bt_enable")),
+                MenuItem(config_item=config.get_option("bt_bulb")),
+                MenuItem(config_item=config.get_option("bt_af_enable")),
                 exit_item,
             ],
         ),

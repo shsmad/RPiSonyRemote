@@ -15,14 +15,15 @@ from luma.oled.device import ssd1306
 
 from libs.button import Button
 from libs.device.input import DigitalInputDevice, IDeviceTriggerMode
-from libs.device.output import LedOutputDevice, ScreenOutputDevice
+from libs.device.output import BluetoothOuputDevice, PinOutputDevice, ScreenOutputDevice
 from libs.helpers import handle_exception, shutdown
 from libs.router import Router
 from menu.data import get_config
 from menu.oled import OledMenu
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
+    # format="%(asctime)s,%(msecs)d %(levelname)s %(filename)s:%(lineno)d\n\t%(message)s",
     format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
     datefmt="%H:%M:%S",
 )
@@ -56,6 +57,12 @@ config = get_config(storage)
 
 oled_menu = OledMenu(None, oled=device, config=config)
 
+bt_o_device = BluetoothOuputDevice(
+    shutter_lag=config.get_value("shutter_lag"),
+    release_lag=config.get_value("release_lag"),
+    enabled=config.get_value("bt_enable"),
+)
+
 router = Router(
     [
         DigitalInputDevice(
@@ -76,12 +83,16 @@ router = Router(
             canvas=oled_menu.draw,
             shutter_lag=config.get_value("shutter_lag"),
             release_lag=config.get_value("release_lag"),
+            enabled=config.get_value("oled_blink_enable"),
         ),
-        LedOutputDevice(
-            pin=29,
+        PinOutputDevice(
+            pin=29,  # rpi0 led
             shutter_lag=config.get_value("shutter_lag"),
             release_lag=config.get_value("release_lag"),
+            enabled=config.get_value("led_blink_enable"),
+            inverted=True,
         ),
+        bt_o_device,
     ],
     config,
 )
@@ -165,6 +176,7 @@ def main() -> None:
     setup()
     try:
         loop.create_task(oled_menu.tick())
+        loop.create_task(bt_o_device.search())
         loop.run_forever()
 
     except Exception:

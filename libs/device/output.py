@@ -1,10 +1,16 @@
 import asyncio
 import logging
 
+from typing import Optional, Union
+
 import RPi.GPIO as GPIO
 
+from bleak import BleakClient
+from bleak.backends.characteristic import BleakGATTCharacteristic
+from bleak.backends.device import BLEDevice
 from luma.core.render import canvas as Canvas
 
+from libs.ble.utils import F_ACQUIRED, F_LOST, S_ACTIVE, S_READY, SFD, SFU, SHD, SHU, get_sony_device
 from libs.fontawesome import fa
 
 logger = logging.getLogger(__name__)
@@ -75,17 +81,20 @@ class ScreenOutputDevice(OutputDevice):
         logger.info(f"<- ScreenOutputDevice Release {self.release_lag}")
 
 
-class LedOutputDevice(OutputDevice):
-    def __init__(self, pin: int = 29, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
-        self.pin = pin
-        GPIO.setup(pin, GPIO.OUT)
+class PinOutputDevice(OutputDevice):
+    def __init__(
+        self, pin: int = 29, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True, inverted: bool = False
+    ):
         super().__init__(shutter_lag, release_lag, enabled)
+        self.pin = pin
+        self.inverted = inverted
+        GPIO.setup(pin, GPIO.OUT)
 
     async def shutter(self) -> None:
         self.can_release = False
         logger.info(f"-> LedOutputDevice Shutter {self.shutter_lag}")
         await asyncio.sleep(self.shutter_lag / 1000)
-        GPIO.output(self.pin, GPIO.LOW)  # rpi0 led is inverted
+        GPIO.output(self.pin, GPIO.LOW if self.inverted else GPIO.HIGH)  # rpi0 led is inverted
         logger.info(f"<- LedOutputDevice Shutter {self.shutter_lag}")
         self.can_release = True
 
@@ -94,69 +103,94 @@ class LedOutputDevice(OutputDevice):
             await asyncio.sleep(0.01)
         logger.info(f"-> LedOutputDevice Release {self.release_lag}")
         await asyncio.sleep(self.release_lag / 1000)
-        GPIO.output(self.pin, GPIO.HIGH)  # rpi0 led is inverted
+        GPIO.output(self.pin, GPIO.HIGH if self.inverted else GPIO.LOW)  # rpi0 led is inverted
         logger.info(f"<- LedOutputDevice Release {self.release_lag}")
 
 
-# class PinOutputDevice(OutputDevice):
-#     def __init__(self, activateDelay: int, deactivateDelay: int, enabled: bool, pin: int):
-#         super().__init__(activateDelay, deactivateDelay, enabled)
-#         self.pin = pin
-#         GPIO.setup(self.pin, GPIO.OUT)
+class BluetoothOuputDevice(OutputDevice):
+    def __init__(self, shutter_lag: int = 0, release_lag: int = 0, enabled: bool = True):
+        super().__init__(shutter_lag, release_lag, enabled)
+        self.device: Optional[Union[str, BLEDevice]] = None
+        self.client: Optional[BleakClient] = None
+        self.command_handle = None
+        self.notify_handle = None
+        self.af_enabled = False
+        self._focus_acquired = False
+        self._shutter_active = False
 
-#     def tick(self, trigger: bool) -> None:
-#         if self.enabled and trigger and not self.activateTimer.active() and not self.active:
-#             self.activateTimer.setTimerMode()
-#             self.activateTimer.setTime(self.activateDelay)
-#             self.activateTimer.start()
+    def notification_handler(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
+        logger.info("BLE notification_handler %s: %r", characteristic, data)
+        if data == F_ACQUIRED:
+            self._focus_acquired = True
+        if data == S_ACTIVE:
+            self._shutter_active = True
+        if data == S_READY:
+            self._shutter_active = False
+        if data == F_LOST:
+            self._focus_acquired = False
 
-#         if self.activateTimer.tick() and self.enabled:
-#             self.active = True
-#             GPIO.output(self.pin, GPIO.HIGH)
+    async def search(self) -> None:
+        logger.debug("BluetoothOuputDevice.search")
+        devices = await get_sony_device()
+        if len(devices):
+            self.client = BleakClient(devices[0][0])
+            await self.client.connect()
+            logger.debug(f"Connected: {self.client.is_connected}")
 
-#             self.deactivateTimer.setTimerMode()
-#             self.deactivateTimer.setTime(self.deactivateDelay)
-#             self.deactivateTimer.start()
+            for service in self.client.services:
+                print(service.uuid)
+                if service.uuid.lower() != "8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF".lower():
+                    continue
 
-#         if self.enabled and self.active and trigger:
-#             self.deactivateTimer.setTimerMode()
-#             self.deactivateTimer.setTime(self.deactivateDelay)
-#             self.deactivateTimer.start()
+                for char in service.characteristics:
+                    if char.uuid.startswith("0000ff01"):
+                        self.command_handle = char.handle
 
-#         if self.active and self.deactivateTimer.tick():
-#             GPIO.output(self.pin, GPIO.LOW)
-#             self.active = False
-#             self.activateTimer.stop()
-#             self.deactivateTimer.stop()
+                    if char.uuid.startswith("0000ff02"):
+                        self.notify_handle = char.handle
 
+        if self.notify_handle:
+            await self.client.start_notify(self.notify_handle, self.notification_handler)
 
-# class OledOutputDevice(OutputDevice):
-#     def __init__(self, activateDelay: int, deactivateDelay: int, enabled: bool, oled: LumaDevice):
-#         super().__init__(activateDelay, deactivateDelay, enabled)
-#         self.screen = oled
+    async def shutter(self, bulb_mode: bool = True) -> None:
+        if not self.client or not self.command_handle or self._shutter_active:
+            return
 
-#     def tick(self, trigger: bool) -> None:
-#         if self.enabled and trigger and not self.activateTimer.active() and not self.active:
-#             self.activateTimer.setTimerMode()
-#             self.activateTimer.setTime(self.activateDelay)
-#             self.activateTimer.start()
+        self.can_release = False
+        await self.client.write_gatt_char(self.command_handle, SHU)
+        if self.af_enabled:
+            await self.client.write_gatt_char(self.command_handle, SHD)
+            while not self._focus_acquired:
+                await asyncio.sleep(0.01)
 
-#         if self.activateTimer.tick() and self.enabled:
-#             self.active = True
-#             self.screen.invertDisplay(True)  # TODO
-#             self.screen.update()
-#             self.deactivateTimer.setTimerMode()
-#             self.deactivateTimer.setTime(self.deactivateDelay)
-#             self.deactivateTimer.start()
+        if self.shutter_lag:
+            await asyncio.sleep(self.shutter_lag / 1000)
 
-#         if self.enabled and self.active and trigger:
-#             self.deactivateTimer.setTimerMode()
-#             self.deactivateTimer.setTime(self.deactivateDelay)
-#             self.deactivateTimer.start()
+        await self.client.write_gatt_char(self.command_handle, SFD)
+        await self.client.write_gatt_char(self.command_handle, SFU)
 
-#         if self.active and self.deactivateTimer.tick():
-#             self.screen.invertDisplay(False)  # TODO
-#             self.screen.update()
-#             self.active = False
-#             self.activateTimer.stop()
-#             self.deactivateTimer.stop()
+        if self.af_enabled:
+            while not bulb_mode and self._shutter_active:
+                await asyncio.sleep(0.01)
+            await self.client.write_gatt_char(self.command_handle, SHU)
+
+        logger.info(f"<- BluetoothOuputDevice Shutter {self.shutter_lag}")
+        self.can_release = True
+
+    async def release(self, bulb_mode: bool = True) -> None:
+        logger.info(f"-> BluetoothOuputDevice Release {self.release_lag}")
+        logger.info(f"\t{bulb_mode} {self._shutter_active}")
+        if not self.client or not self.command_handle or not bulb_mode:
+            return
+
+        max_limit = 100
+        while not self.can_release and not self._shutter_active and max_limit:
+            max_limit -= 1
+            await asyncio.sleep(0.01)
+
+        logger.info(f"-> BluetoothOuputDevice Release {self.release_lag} {max_limit}")
+        await asyncio.sleep(self.release_lag / 1000)
+        # in bulb mode to release the shutter you should press button again (see https://github.com/coral/freemote/issues/6)
+        await self.client.write_gatt_char(self.command_handle, SFD)
+        await self.client.write_gatt_char(self.command_handle, SFU)
+        logger.info(f"<- BluetoothOuputDevice Release {self.release_lag}")
