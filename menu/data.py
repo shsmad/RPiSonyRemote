@@ -3,6 +3,9 @@ import logging
 from enum import Enum
 from typing import Any, Optional
 
+from libs.eventbus import EventBusDefaultDict
+from libs.eventtypes import ConfigChangeEvent
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,9 +17,16 @@ class ParamType(Enum):
     FOLDER = 4
 
 
-class FieldMeta(type):
-    def __init__(self, name: str, bases: tuple, attrs: dict[str, Any]) -> None:
-        print(f"FieldMeta: name={name}, bases={bases}, attrs={attrs}")
+class ConfigMeta(type):
+    _instances: dict[type, Any] = {}
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if self not in self._instances:
+            # self._instances[self] = super(Singleton, self).__call__(*args, **kwargs)
+            self._instances[self] = super().__call__(*args, **kwargs)
+        return self._instances[self]
+
+    def __init__(self, name: str, bases: tuple[type], attrs: dict[str, Any]) -> None:
         for attr_name, attr_value in attrs.items():
             if isinstance(attr_value, ConfigItem):
                 attr_value.key = attr_name
@@ -30,10 +40,10 @@ class ConfigItem:
         self.default_value = default_value
         self.icon = icon
         self.storage: Any = None
+        self.bus = EventBusDefaultDict()  # noqa: F821
 
     @property
     def value(self) -> Any:
-        print(self.storage)
         try:
             from_db = self.storage.get(self.key)
             if from_db is None:
@@ -53,19 +63,19 @@ class ConfigItem:
         return self.storage.get(self.key, self.default_value)
 
     @value.setter
-    def value(self, v: Any) -> None:
+    def value(self, new_value: Any) -> None:
         try:
             if self.param_type == ParamType.BOOL:
-                self.storage[self.key] = "1" if v else ""
+                self.storage[self.key] = "1" if new_value else ""
             elif self.param_type in (ParamType.INT, ParamType.FLOAT):
-                self.storage[self.key] = str(v)
-            else:
-                return
+                self.storage[self.key] = str(new_value)
+
+            self.bus.emit(ConfigChangeEvent(key=self.key, param_type=self.param_type, new_value=new_value))
         except Exception as e:
             logger.exception(e)
 
 
-class Config(metaclass=FieldMeta):
+class Config(metaclass=ConfigMeta):
     analog_trigger_enable = ConfigItem("A.Enable", ParamType.BOOL, False, "wave-sine")
     analog_trigger_threshold = ConfigItem("A.Barrier", ParamType.INT, 200, "dial")
     analog_trigger_direction = ConfigItem("A.Above", ParamType.BOOL, False, "arrow-up-from-dotted-line")
@@ -79,6 +89,7 @@ class Config(metaclass=FieldMeta):
     oled_blink_enable = ConfigItem("Blink Screen", ParamType.BOOL, True, "display")
     led_blink_enable = ConfigItem("Blink LED", ParamType.BOOL, True, "lightbulb")
     trigger_read_timer = ConfigItem("ReadTimer", ParamType.INT, 60, "clock")
+    night_mode = ConfigItem("Night Mode", ParamType.BOOL, False, "moon")
 
     bt_enable = ConfigItem("Enable BT", ParamType.BOOL, False, "bluetooth-b")
     bt_bulb = ConfigItem("BULB mode", ParamType.BOOL, False, "hand-point-down")
@@ -116,10 +127,6 @@ class MenuItem:
         return (self.config_item.param_type if self.config_item else self.item_type) or ParamType.FOLDER
 
 
-def get_config(storage: Any) -> Config:
-    return Config(storage)
-
-
 def create_menu_tree(config: Config) -> list[MenuItem]:
     exit_item = MenuItem(ParamType.EXIT, "Exit", "arrow-turn-down-left")
     return [
@@ -154,6 +161,7 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
                 MenuItem(config_item=config.oled_blink_enable),
                 MenuItem(config_item=config.led_blink_enable),
                 MenuItem(config_item=config.trigger_read_timer),
+                MenuItem(config_item=config.night_mode),
                 exit_item,
             ],
         ),

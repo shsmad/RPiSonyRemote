@@ -1,61 +1,24 @@
-import asyncio
 import logging
-import time
 
 from datetime import datetime
-from typing import Any, Callable, Optional, Union
+from typing import Any, Union
 
 from luma.core.render import canvas
 from luma.oled.device import device as LumaDevice
 from PIL import ImageFont
 
+from libs.eventbus import EventBusDefaultDict
+from libs.eventtypes import ConfigChangeEvent, HWInfoUpdateEvent, MenuClickEvent, MenuHoldEvent, MenuRotateEvent
 from libs.fontawesome import fa
-from libs.hwinfo import HWInfo
-from libs.timer import TimerMs
-from utils import circular_increment
+
+# from libs.hwinfo import HWInfo
+from utils import TaskTimer, circular_increment
 
 from .data import Config, MenuItem, ParamType, create_menu_tree
 
 logger = logging.getLogger(__name__)
 
 FONTS = {x: ImageFont.truetype("fonts/better-vcr-5.2.ttf", x) for x in range(4, 33, 2)}
-
-
-async def process_timer(interval: int, callback: Callable[[], None]) -> None:
-    """
-    Run a timer that calls a callback function repeatedly at a given interval.
-
-    Args:
-        interval (int): The interval in milliseconds.
-        callback (Callable[[], None]): The callback function to be called.
-
-    Returns:
-        None
-    """
-    while True:
-        await asyncio.sleep(interval / 1000)
-        callback()
-
-
-class TaskTimer:
-    def __init__(self, interval: int, callback: Callable[[], None]) -> None:
-        self.interval = interval
-        self.callback = callback
-        self.task: Optional[asyncio.Task] = None
-
-    def start(self) -> None:
-        if self.task:
-            self.task.cancel()
-
-        self.task = asyncio.create_task(process_timer(self.interval, self.callback))
-
-    def stop(self) -> None:
-        if self.task:
-            self.task.cancel()
-            self.task = None
-
-    def __repr__(self) -> str:
-        return f"TaskTimer(interval={self.interval}, callback={self.callback})"
 
 
 class OledMenu:
@@ -80,7 +43,6 @@ class OledMenu:
             config: The config object.
         """
         self._reset_to_splash_timeout = reset_to_splash_timeout
-        self._refreshTimer = TimerMs(500, start=True, run_once=False)
         self.ameter = ameter
         self.config = config
         self.menuLevel = 0
@@ -88,48 +50,44 @@ class OledMenu:
         self.menuItems = create_menu_tree(config=self.config)
         self._oled = oled
         self.draw = canvas(self._oled)
-        self.hwinfo = HWInfo()
 
         self._t_reset_to_splashscreen = TaskTimer(interval=reset_to_splash_timeout, callback=self.reset_to_splashscreen)
-        self._t_update_hwinfo = TaskTimer(interval=1000, callback=self.update_hwinfo)
+
+        self.bus = EventBusDefaultDict()
+        self.bus.add_listener(MenuRotateEvent, self.on_menu_rotate)
+        self.bus.add_listener(MenuClickEvent, self.on_menu_click)
+        self.bus.add_listener(MenuHoldEvent, self.on_menu_hold)
+        self.bus.add_listener(HWInfoUpdateEvent, self.on_update_hwinfo)
+        self.bus.add_listener(ConfigChangeEvent, self.on_config_change)
 
     def init(self) -> None:
         """
         Initializes the object and draws the splash screen.
         """
-        self._oled.contrast(255)
-        self.draw_splash_screen()
-        time.sleep(1)
-        self._oled.contrast(10)
+        self._oled.contrast(10 if self.config.night_mode.value else 255)
         self.draw_splash_screen()
 
-    def update_hwinfo(self) -> None:
-        """
-        Update the hardware info.
+    async def on_config_change(self, event: ConfigChangeEvent) -> None:
+        if event.key == "night_mode":
+            self._oled.contrast(10 if event.new_value else 255)
 
-        Args:
-            self: The instance of the class.
+    async def on_update_hwinfo(self, event: HWInfoUpdateEvent) -> None:
+        if self.menuLevel != 0:
+            return
 
-        Returns:
-            None
-        """
-        self.hwinfo.update()
-        if self.hwinfo.is_changed() and self.menuLevel == 0:
-            data = self.hwinfo.read_and_reset()
-
-            try:
-                with self.draw as draw:
-                    draw.rectangle((0, 47, self._oled.width, self._oled.height), outline="black", fill="black")
-                    charge_sign = "+" if data["is_charging"] else "-"
-                    draw.text(
-                        (0, 48),
-                        f"C{data['cpu']:2d} M{data['memory']:2d} V{data['voltage']:3.1f}{charge_sign}{data['capacity']:2d}% {data['temperature']:2d}℃",
-                        font=FONTS[8],
-                        fill=255,
-                    )
-                    draw.text((0, 57), data["ip"], font=FONTS[8], fill=255)
-            except Exception as e:
-                print(e)
+        try:
+            with self.draw as draw:
+                draw.rectangle((0, 47, self._oled.width, self._oled.height), outline="black", fill="black")
+                charge_sign = "+" if event.is_charging else "-"
+                draw.text(
+                    (0, 48),
+                    f"C{event.cpu:2d} M{event.memory:2d} V{event.voltage:3.1f}{charge_sign}{event.capacity:2d}% {event.temperature:2d}℃",
+                    font=FONTS[8],
+                    fill=255,
+                )
+                draw.text((0, 57), event.ip, font=FONTS[8], fill=255)
+        except Exception as e:
+            logger.exception(e)
 
     def draw_splash_screen(self) -> None:
         now = datetime.now().strftime("%H:%M:%S")
@@ -248,25 +206,12 @@ class OledMenu:
         except Exception as e:
             logger.exception(e)
 
-    async def tick(self) -> None:
-        print("oled tick")
-        self._t_update_hwinfo.start()
-        # if not self._refreshTimer.tick():
-        #     return
-
-        # if self._resetToSplashScreenTimer.ready() or ((self.menuLevel == 0) and ameter->isEnabled() && ameter->isChanged()))
-        # {
-        #    self._resetToSplashScreenTimer.stop()
-        #    self.menuLevel = 0
-        #    self.drawSplashScreen()
-        # };
-
     def reset_to_splashscreen(self) -> None:
         self._t_reset_to_splashscreen.stop()
         self.menuLevel = 0
         self.draw_splash_screen()
 
-    def onKeyClick(self) -> None:
+    async def on_menu_click(self, event: MenuClickEvent) -> None:
         """
         menuLevel:
             0 - splash screen
@@ -321,7 +266,9 @@ class OledMenu:
         self.draw_menu_screen(self._current_menu_position[self.menuLevel])
         self._t_reset_to_splashscreen.start()
 
-    def onKeyClickAfterHold(self, pin: int, steps: int, hold: int) -> None:
+    async def on_menu_hold(self, event: MenuHoldEvent) -> None:
+        # [pin, steps, hold] = event
+
         if self.menuLevel == 3:
             self._edit_precision = circular_increment(self._edit_precision, 0, 2, 1)
             try:
@@ -335,9 +282,9 @@ class OledMenu:
                 ):
                     draw_item_editor(self._oled, current_item, self._edit_precision)
             except Exception as e:
-                print(e)
+                logger.exception(e)
 
-    def onRotate(self, direction: int, counter: int, fast: bool) -> None:
+    async def on_menu_rotate(self, event: MenuRotateEvent) -> None:
         menu_length = 0
         if self.menuLevel == 1:
             menu_length = len(self.menuItems) - 1
@@ -350,7 +297,7 @@ class OledMenu:
                 self._current_menu_position[self.menuLevel],
                 0,
                 menu_length,
-                direction * (10 if fast else 1),
+                event.direction,
             )
         if self.menuLevel == 3:
             current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
@@ -363,7 +310,7 @@ class OledMenu:
                 return
 
             if param_type == ParamType.BOOL:
-                print(f"Here we rotate {current_item.get_title()} with {current_item.config_item.value}")
+                logger.info(f"Here we rotate {current_item.get_title()} with {current_item.config_item.value}")
                 current_item.config_item.value = not current_item.config_item.value
                 draw_item_editor(self._oled, current_item, 0)
                 return
@@ -371,13 +318,13 @@ class OledMenu:
             delta: Union[int, float] = 0
 
             if param_type == ParamType.INT:
-                delta = int_delta(direction, self._edit_precision)
+                delta = int_delta(event.direction, self._edit_precision)
                 current_item.config_item.value = current_item.config_item.value + delta
                 draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
             if param_type == ParamType.FLOAT:
-                delta = float_delta(direction, self._edit_precision)
+                delta = float_delta(event.direction, self._edit_precision)
                 current_item.config_item.value = current_item.config_item.value + delta
                 draw_item_editor(self._oled, current_item, self._edit_precision)
                 return

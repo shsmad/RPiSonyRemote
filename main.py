@@ -16,7 +16,6 @@ logging.basicConfig(
 # define ANALOG_IN_PIN A2
 # define DIGITAL_IN_PIN 8
 # define OPTRON_OUT_PIN LED_BUILTIN
-# include <TimerMs.h>
 # include "settings/settings.h"
 # include "bleeeprom/EEManager.h"
 # include "menu/oled.h"

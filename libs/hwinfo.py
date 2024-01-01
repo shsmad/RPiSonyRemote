@@ -1,14 +1,14 @@
+import asyncio
 import contextlib
-import os
 import struct
 import subprocess
-import time
-
-from typing import Union
 
 import psutil
 import RPi.GPIO as GPIO
 import smbus
+
+from libs.eventbus import EventBusDefaultDict
+from libs.eventtypes import HWInfoUpdateEvent
 
 
 def read_voltage(address: int, bus: smbus.SMBus) -> float:
@@ -48,6 +48,7 @@ class HWInfo:
     __capacity = 0
     __temperature = 0
     __ip = ""
+    __is_charging = 0
     __changed = False
     __ups_address = 0x32
 
@@ -55,9 +56,11 @@ class HWInfo:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(4, GPIO.IN)
-        self.bus = smbus.SMBus(1)  # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
-        power_on_reset(self.__ups_address, self.bus)
-        quick_start(self.__ups_address, self.bus)
+        self.bus = EventBusDefaultDict()
+        self.smbus = smbus.SMBus(1)  # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
+        power_on_reset(self.__ups_address, self.smbus)
+        quick_start(self.__ups_address, self.smbus)
+        # self.task = TaskTimer(interval=1000, callback=self.read_and_reset)
 
     @property
     def cpu(self) -> int:
@@ -119,42 +122,46 @@ class HWInfo:
             self.__changed = True
         self.__ip = value
 
+    @property
+    def is_charging(self) -> int:
+        return self.__is_charging
+
+    @is_charging.setter
+    def is_charging(self, value: int) -> None:
+        if self.__is_charging != value:
+            self.__changed = True
+        self.__is_charging = value
+
     def is_changed(self) -> bool:
         return self.__changed
 
-    def read_and_reset(self) -> dict[str, Union[str, float, int]]:
-        self.__changed = False
-        return {
-            "cpu": self.cpu,
-            "memory": self.memory,
-            "voltage": self.voltage,
-            "capacity": self.capacity,
-            "temperature": self.temperature,
-            "ip": self.ip,
-            "is_charging": GPIO.input(4),
-        }
+    async def read_and_reset(self, interval: int) -> None:
+        while True:
+            await asyncio.sleep(interval / 1000)
+            self.update()
+
+            if self.is_changed():
+                self.__changed = False
+                self.bus.emit(
+                    HWInfoUpdateEvent(
+                        cpu=self.cpu,
+                        memory=self.memory,
+                        voltage=self.voltage,
+                        capacity=self.capacity,
+                        temperature=self.temperature,
+                        ip=self.ip,
+                        is_charging=self.is_charging,
+                    ),
+                    no_log=True,
+                )
 
     def update(self) -> None:
         self.cpu = round(psutil.cpu_percent())
         self.memory = round(psutil.virtual_memory().percent)
-        self.voltage = read_voltage(self.__ups_address, self.bus)
-        self.capacity = round(readCapacity(self.__ups_address, self.bus))
+        self.voltage = read_voltage(self.__ups_address, self.smbus)
+        self.capacity = round(readCapacity(self.__ups_address, self.smbus))
+        self.is_charging = GPIO.input(4)
         with contextlib.suppress(Exception):
             s = subprocess.check_output(["vcgencmd", "measure_temp"]).decode()
             self.temperature = round(float(s.split("=")[1][:-3]))
             self.ip = get_ip()
-
-
-if __name__ == "__main__":
-    hwinfo = HWInfo()
-    print("CPU usage %: ", psutil.cpu_percent(), "%")
-    print("Mem Usage %:", psutil.virtual_memory().percent, "%")
-    print(os.uname())
-    while True:
-        hwinfo.update()
-        time.sleep(0.1)
-        if hwinfo.is_changed():
-            print(hwinfo.read_and_reset())
-
-# https://github.com/linshuqin329/UPS-Lite/blob/master/UPS-Lite_V1.3_CW2015/UPS_Lite_V1.3_CW2015.py
-# vcgencmd measure_temp

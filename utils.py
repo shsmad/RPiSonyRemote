@@ -1,5 +1,8 @@
+import asyncio
+
 from enum import Enum
-from typing import Union
+from threading import Timer
+from typing import Any, Callable, Optional, Union
 
 
 def circular_increment(value: int, minimum: int, maximum: int, increment: int) -> int:
@@ -61,3 +64,45 @@ def get_x_position(max_width: int, align: TextAlign, letter_width: int, value: U
 
     if align == TextAlign.TA_RIGHT:
         return (max_width - len(value_str)) * letter_width
+
+
+class Singleton(type):
+    _instances: dict[type, Any] = {}
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if self not in self._instances:
+            # self._instances[self] = super(Singleton, self).__call__(*args, **kwargs)
+            self._instances[self] = super().__call__(*args, **kwargs)
+        return self._instances[self]
+
+
+class RepeatTimer(Timer):
+    def run(self) -> None:
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
+
+
+class TaskTimer:
+    def __init__(self, interval: int, callback: Callable[[], None]) -> None:
+        self.interval = interval
+        self.callback = callback
+        self.task: Optional[asyncio.Task] = None
+
+    async def process_timer(self, interval: int, callback: Callable[[], None]) -> None:
+        while True:
+            await asyncio.sleep(interval / 1000)
+            callback()
+
+    def start(self) -> None:
+        if self.task:
+            self.task.cancel()
+
+        self.task = asyncio.create_task(self.process_timer(self.interval, self.callback))
+
+    def stop(self) -> None:
+        if self.task:
+            self.task.cancel()
+            self.task = None
+
+    def __repr__(self) -> str:
+        return f"TaskTimer(interval={self.interval}, callback={self.callback})"
