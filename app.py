@@ -11,7 +11,7 @@ from luma.oled.device import ssd1306
 
 from libs.button import Button
 from libs.device.input import DigitalInputDevice
-from libs.device.output import BluetoothOuputDevice, PinOutputDevice, ScreenOutputDevice
+from libs.device.output import BluetoothOuputDevice, GPhotoOutputDevice, ScreenCounterOutputDevice
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import (
     ButtonClickEvent,
@@ -55,7 +55,7 @@ class Application:
         self.setup_devices()
         self.setup_buttons()
 
-        self.hwinfo = HWInfo()
+        self.hwinfo = HWInfo(config=self.config)
 
     def setup_loop(self, loop_debug: bool = False, loop_slow_callback_duration: float = 0.2) -> None:
         self.loop = asyncio.get_event_loop()
@@ -78,11 +78,14 @@ class Application:
         #     shutter_lag=config.shutter_lag.value,
         #     release_lag=config.release_lag.value,
         # ),
-        scr_o = ScreenOutputDevice(config=self.config, canvas=self.oled_menu.draw)
-        pin_o = PinOutputDevice(config=self.config, pin=RPI0_LED, inverted=True)
+        # scr_o = ScreenOutputDevice(config=self.config, canvas=self.oled_menu.draw)
+        scrc_o = ScreenCounterOutputDevice(config=self.config, canvas=self.oled_menu.draw)
+        # pin_o = PinOutputDevice(config=self.config, pin=RPI0_LED, inverted=True)
         self.bt_o = BluetoothOuputDevice(config=self.config)
 
-        self.router = Router(input_devices=[di_i], output_devices=[scr_o, pin_o, self.bt_o])
+        gphoto_o = GPhotoOutputDevice(config=self.config)
+
+        self.router = Router(input_devices=[di_i], output_devices=[scrc_o, gphoto_o])
 
     def setup_buttons(self) -> None:
         self.buttons = [Button(BUTTON_LEFT), Button(BUTTON_RIGHT), Button(BUTTON_ENTER)]
@@ -101,8 +104,9 @@ class Application:
         self.oled_menu.init()
 
         try:
-            self.loop.create_task(self.hwinfo.read_and_reset(1000))
+            # self.loop.create_task(self.hwinfo.read_and_reset(1000))
             self.loop.create_task(self.bt_o.search())
+            logging.info("Starting the RPiSonyRemote service.")
             self.loop.run_forever()
 
         except Exception as e:

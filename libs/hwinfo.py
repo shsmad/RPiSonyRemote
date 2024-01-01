@@ -9,6 +9,7 @@ import smbus
 
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import HWInfoUpdateEvent
+from menu.data import Config
 
 
 def read_voltage(address: int, bus: smbus.SMBus) -> float:
@@ -52,10 +53,11 @@ class HWInfo:
     __changed = False
     __ups_address = 0x32
 
-    def __init__(self) -> None:
+    def __init__(self, config: Config) -> None:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(4, GPIO.IN)
+        self.config = config
         self.bus = EventBusDefaultDict()
         self.smbus = smbus.SMBus(1)  # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
         power_on_reset(self.__ups_address, self.smbus)
@@ -138,6 +140,9 @@ class HWInfo:
     async def read_and_reset(self, interval: int) -> None:
         while True:
             await asyncio.sleep(interval / 1000)
+            if not self.config.hwinfo_enable.value:
+                continue
+
             self.update()
 
             if self.is_changed():

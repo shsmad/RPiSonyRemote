@@ -6,3 +6,4 @@ psutil
 RPi_AS3935
 smbus
 pyyaml
+gphoto2

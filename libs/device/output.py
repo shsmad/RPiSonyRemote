@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import time
 
 from typing import Optional, Union
 
+import gphoto2 as gp
 import RPi.GPIO as GPIO
 
 from bleak import BleakClient
@@ -13,6 +15,7 @@ from luma.core.render import canvas as Canvas
 from libs.ble.utils import F_ACQUIRED, F_LOST, S_ACTIVE, S_READY, SFD, SFU, SHD, SHU, get_sony_device
 from libs.fontawesome import fa
 from menu.data import Config
+from menu.oled import FONTS
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +27,11 @@ class OutputDevice:
 
     @property
     def shutter_lag(self) -> int:
-        return self.config.shutter_lag.value
+        return self.config.shutter_lag.value  # type: ignore
 
     @property
     def release_lag(self) -> int:
-        return self.config.release_lag.value
+        return self.config.release_lag.value  # type: ignore
 
     @property
     def enabled(self) -> bool:
@@ -67,7 +70,7 @@ class ScreenOutputDevice(OutputDevice):
 
     @property
     def enabled(self) -> bool:
-        return self.config.oled_blink_enable.value
+        return self.config.oled_blink_enable.value  # type: ignore
 
     async def shutter(self) -> None:
         self.can_release = False
@@ -96,6 +99,36 @@ class ScreenOutputDevice(OutputDevice):
         logger.info(f"<- ScreenOutputDevice Release {self.release_lag}")
 
 
+class ScreenCounterOutputDevice(OutputDevice):
+    def __init__(self, config: Config, canvas: Canvas):
+        super().__init__(config)
+        self.draw = canvas
+        self.active = False
+
+    @property
+    def enabled(self) -> bool:
+        return True  # type: ignore
+
+    async def shutter(self) -> None:
+        self.active = True
+        logger.info(f"-> ScreenCounterOutputDevice Shutter {self.shutter_lag}")
+        start = time.monotonic()
+        while self.active:
+            with self.draw as draw:
+                draw.rectangle((0, 16, 128, 32), fill="black", outline="black")
+                draw.text((0, 16), f"{time.monotonic() - start}", font=FONTS[8], fill="white")
+            await asyncio.sleep(0.01)
+        logger.info(f"<- ScreenCounterOutputDevice Shutter {self.shutter_lag}")
+
+    async def release(self) -> None:
+        logger.info(f"-> ScreenCounterOutputDevice Release {self.release_lag}")
+        await asyncio.sleep(self.release_lag / 1000)
+        self.active = False
+        # with self.draw as draw:
+        #     draw.rectangle((0, 16, 64, 32), fill="black", outline="black")
+        logger.info(f"<- ScreenCounterOutputDevice Release {self.release_lag}")
+
+
 class PinOutputDevice(OutputDevice):
     def __init__(self, config: Config, pin: int = 29, inverted: bool = False):
         super().__init__(config)
@@ -105,7 +138,7 @@ class PinOutputDevice(OutputDevice):
 
     @property
     def enabled(self) -> bool:
-        return self.config.led_blink_enable.value
+        return self.config.led_blink_enable.value  # type: ignore
 
     async def shutter(self) -> None:
         self.can_release = False
@@ -137,7 +170,7 @@ class BluetoothOuputDevice(OutputDevice):
 
     @property
     def enabled(self) -> bool:
-        return self.config.bt_enable.value
+        return self.config.bt_enable.value  # type: ignore
 
     def notification_handler(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
         logger.info("BLE notification_handler %s: %r", characteristic, data)
@@ -172,7 +205,7 @@ class BluetoothOuputDevice(OutputDevice):
         if self.notify_handle:
             await self.client.start_notify(self.notify_handle, self.notification_handler)
 
-    async def shutter(self, bulb_mode: bool = True) -> None:
+    async def shutter(self, bulb_mode: bool = False) -> None:
         if not self.client or not self.command_handle or self._shutter_active:
             return
 
@@ -197,7 +230,7 @@ class BluetoothOuputDevice(OutputDevice):
         logger.info(f"<- BluetoothOuputDevice Shutter {self.shutter_lag}")
         self.can_release = True
 
-    async def release(self, bulb_mode: bool = True) -> None:
+    async def release(self, bulb_mode: bool = False) -> None:
         logger.info(f"-> BluetoothOuputDevice Release {self.release_lag}")
         logger.info(f"\t{bulb_mode} {self._shutter_active}")
         if not self.client or not self.command_handle or not bulb_mode:
@@ -214,3 +247,49 @@ class BluetoothOuputDevice(OutputDevice):
         await self.client.write_gatt_char(self.command_handle, SFD)
         await self.client.write_gatt_char(self.command_handle, SFU)
         logger.info(f"<- BluetoothOuputDevice Release {self.release_lag}")
+
+
+class GPhotoOutputDevice(OutputDevice):
+    def __init__(self, config: Config):
+        super().__init__(config)
+        self.client = None
+        self.camera = gp.Camera()
+
+    async def search(self) -> None:
+        logger.debug("GPhotoOutputDevice.search")
+        while True:
+            try:
+                self.camera.init()
+            except gp.GPhoto2Error as ex:
+                if ex.code == gp.GP_ERROR_MODEL_NOT_FOUND:
+                    # no camera, try again in 2 seconds
+                    await asyncio.sleep(2)
+                    continue
+                # some other error we can't handle here
+                raise
+            # operation completed successfully so exit loop
+            break
+
+    async def shutter(self) -> None:
+        # config = self.camera.get_single_config("shutterspeed")
+        # shutterspeed = config.get_value()
+        # config = self.camera.get_single_config("iso")
+        # iso = config.get_value()
+        # config = self.camera.get_single_config("focusmode")
+        # focusmode = config.get_value()
+        # In [34]: list(config.get_choices())
+        # Out[34]: ['Automatic', 'AF-A', 'AF-C', 'DMF', 'Manual']
+        # f-number
+
+        logger.info(f"-> GPhotoOutputDevice Shutter {self.shutter_lag}")
+        self.can_release = False
+        if self.shutter_lag:
+            await asyncio.sleep(self.shutter_lag / 1000)
+        self.camera.trigger_capture()
+        logger.info(f"<- GPhotoOutputDevice Shutter {self.shutter_lag}")
+        self.can_release = True
+
+    async def release(self) -> None:
+        logger.info(f"-> GPhotoOutputDevice Release {self.release_lag}")
+        await asyncio.sleep(self.release_lag / 1000)
+        logger.info(f"<- GPhotoOutputDevice Release {self.release_lag}")

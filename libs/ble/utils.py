@@ -1,6 +1,6 @@
 import logging
 
-from bleak import BleakClient, BleakScanner
+from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
@@ -56,18 +56,3 @@ async def get_sony_device(timeout: int = 5) -> list[tuple[BLEDevice, Advertiseme
             res.append((device, adv))
 
     return res
-
-
-async def take_shot(client: BleakClient, handle: int, af_enabled: bool = False) -> None:
-    # TODO: MF mode
-    # Hence in order to take a picture, you start by sending 0x0106 to the camera and then 0x0107.
-    await client.write_gatt_char(handle, SHU)
-    if af_enabled:
-        await client.write_gatt_char(handle, SHD)
-    # If the camera is set to “autofocus” the camera will first send back 0x02 0x3F 0x00 followed by 0x02 0x3F 0x20 with manual focus skipping this.
-    # You then proceed to send the camera 0x0109 and then 0x0108 which takes the picture.
-    await client.write_gatt_char(handle, SFD)
-    await client.write_gatt_char(handle, SFU)
-    # Camera will indicate that the picture has been taken by first sending 0x02 0xA0 0x00 followed by 0x02 0xA0 0x20.
-    # From here you need to send 0x0106 for the camera to reset, otherwise the menu system on the A7 III seems to lock up (???).
-    await client.write_gatt_char(handle, SHU)

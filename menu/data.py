@@ -90,7 +90,7 @@ class Config(metaclass=ConfigMeta):
     led_blink_enable = ConfigItem("Blink LED", ParamType.BOOL, True, "lightbulb")
     trigger_read_timer = ConfigItem("ReadTimer", ParamType.INT, 60, "clock")
     night_mode = ConfigItem("Night Mode", ParamType.BOOL, False, "moon")
-
+    hwinfo_enable = ConfigItem("HWInfo", ParamType.BOOL, False, "microchip")
     bt_enable = ConfigItem("Enable BT", ParamType.BOOL, False, "bluetooth-b")
     bt_bulb = ConfigItem("BULB mode", ParamType.BOOL, False, "hand-point-down")
     bt_af_enable = ConfigItem("Enable AF", ParamType.BOOL, False, "users-viewfinder")
@@ -162,6 +162,7 @@ def create_menu_tree(config: Config) -> list[MenuItem]:
                 MenuItem(config_item=config.led_blink_enable),
                 MenuItem(config_item=config.trigger_read_timer),
                 MenuItem(config_item=config.night_mode),
+                MenuItem(config_item=config.hwinfo_enable),
                 exit_item,
             ],
         ),

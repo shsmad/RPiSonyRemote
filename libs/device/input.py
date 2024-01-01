@@ -19,9 +19,6 @@ class IDeviceTriggerMode(Enum):
 class InputDevice:
     _last_value = 0
     notify_callback = None  # async func
-    mode: IDeviceTriggerMode = IDeviceTriggerMode.ABOVE_THRESHOLD
-    enabled: bool = False
-    bouncetime: int = 0
 
     def __init__(self, config: Config):
         self.config = config
@@ -51,13 +48,22 @@ class DigitalInputDevice(GPIODevice):
     def __init__(self, config: Config, pin: int):
         super().__init__(config, pin)
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        self.mode = (
+
+    @property
+    def mode(self) -> IDeviceTriggerMode:
+        return (
             IDeviceTriggerMode.ABOVE_THRESHOLD
-            if config.digital_trigger_direction.value
+            if self.config.digital_trigger_direction.value
             else IDeviceTriggerMode.BELOW_THRESHOLD
         )
-        self.enabled = config.digital_trigger_enable.value
-        self.bouncetime = config.trigger_read_timer.value
+
+    @property
+    def enabled(self) -> bool:
+        return self.config.digital_trigger_enable.value  # type: ignore
+
+    @property
+    def bouncetime(self) -> int:
+        return self.config.trigger_read_timer.value  # type: ignore
 
     def callback(self, channel: int) -> None:
         if not self.enabled and self.notify_callback is None:
