@@ -1963,6 +1963,9 @@ _codes.update(
         },
         "chess-clock": {"label": "Chess Clock", "styles": ["solidpro"], "unicode": "\uf43d"},
         "outlet": {"label": "Outlet", "styles": ["solidpro"], "unicode": "\ue01c"},
+        "flower-tulip": {"label": "Flower Tulip", "styles": ["solidpro"], "unicode": "\uf801"},
+        "aperture": {"label": "Aperture", "styles": ["solidpro"], "unicode": "\ue2df"},
+        "reel": {"label": "Reel", "styles": ["solidpro"], "unicode": "\ue238"},
     }
 )
 
