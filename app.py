@@ -104,7 +104,7 @@ class Application:
         self.oled_menu.init()
 
         try:
-            # self.loop.create_task(self.hwinfo.read_and_reset(1000))
+            self.loop.create_task(self.hwinfo.read_and_reset(1000))
             self.loop.create_task(self.bt_o.search())
             logging.info("Starting the RPiSonyRemote service.")
             self.loop.run_forever()

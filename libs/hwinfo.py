@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import logging
 import struct
 import subprocess
 
@@ -10,6 +11,8 @@ import smbus
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import HWInfoUpdateEvent
 from menu.data import Config
+
+logger = logging.getLogger(__name__)
 
 
 def read_voltage(address: int, bus: smbus.SMBus) -> float:
@@ -62,7 +65,6 @@ class HWInfo:
         self.smbus = smbus.SMBus(1)  # 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
         power_on_reset(self.__ups_address, self.smbus)
         quick_start(self.__ups_address, self.smbus)
-        # self.task = TaskTimer(interval=1000, callback=self.read_and_reset)
 
     @property
     def cpu(self) -> int:
@@ -143,22 +145,25 @@ class HWInfo:
             if not self.config.hwinfo_enable.value:
                 continue
 
-            self.update()
+            try:
+                self.update()
 
-            if self.is_changed():
-                self.__changed = False
-                self.bus.emit(
-                    HWInfoUpdateEvent(
-                        cpu=self.cpu,
-                        memory=self.memory,
-                        voltage=self.voltage,
-                        capacity=self.capacity,
-                        temperature=self.temperature,
-                        ip=self.ip,
-                        is_charging=self.is_charging,
-                    ),
-                    no_log=True,
-                )
+                if self.is_changed():
+                    self.__changed = False
+                    self.bus.emit(
+                        HWInfoUpdateEvent(
+                            cpu=self.cpu,
+                            memory=self.memory,
+                            voltage=self.voltage,
+                            capacity=self.capacity,
+                            temperature=self.temperature,
+                            ip=self.ip,
+                            is_charging=self.is_charging,
+                        ),
+                        no_log=True,
+                    )
+            except Exception as e:
+                logger.exception(e)
 
     def update(self) -> None:
         self.cpu = round(psutil.cpu_percent())
