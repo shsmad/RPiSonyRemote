@@ -13,6 +13,8 @@ from bleak.backends.device import BLEDevice
 from luma.core.render import canvas as Canvas
 
 from libs.ble.utils import F_ACQUIRED, F_LOST, S_ACTIVE, S_READY, SFD, SFU, SHD, SHU, get_sony_device
+from libs.eventbus import EventBusDefaultDict
+from libs.eventtypes import ConfigChangeEvent
 from libs.fontawesome import fa
 from menu.data import Config
 from menu.oled import FONTS
@@ -24,6 +26,8 @@ class OutputDevice:
     def __init__(self, config: Config):
         self.config = config
         self.can_release = True
+        self.bus = EventBusDefaultDict()
+        self.bus.add_listener(ConfigChangeEvent, self.on_config_change)
 
     @property
     def shutter_lag(self) -> int:
@@ -43,12 +47,28 @@ class OutputDevice:
     async def release(self) -> None:
         pass
 
+    def enable(self) -> None:
+        pass
+
+    def disable(self) -> None:
+        pass
+
+    def on_config_change(self, event: ConfigChangeEvent) -> None:
+        pass
+
 
 class ConsoleOutputDevice(OutputDevice):
     def __init__(self, config: Config):
         super().__init__(config)
 
+    @property
+    def enabled(self) -> bool:
+        return True
+
     async def shutter(self) -> None:
+        if not self.enabled:
+            return
+
         self.can_release = False
         logger.info(f"-> ConsoleOutputDevice Shutter {self.shutter_lag}")
         await asyncio.sleep(self.shutter_lag / 1000)
@@ -56,6 +76,9 @@ class ConsoleOutputDevice(OutputDevice):
         self.can_release = True
 
     async def release(self) -> None:
+        if not self.enabled:
+            return
+
         while not self.can_release:
             await asyncio.sleep(0.01)
         logger.info(f"-> ConsoleOutputDevice Release {self.release_lag}")
@@ -73,6 +96,9 @@ class ScreenOutputDevice(OutputDevice):
         return self.config.oled_blink_enable.value  # type: ignore
 
     async def shutter(self) -> None:
+        if not self.enabled:
+            return
+
         self.can_release = False
         logger.info(f"-> ScreenOutputDevice Shutter {self.shutter_lag}")
         with self.draw as draw:
@@ -86,6 +112,9 @@ class ScreenOutputDevice(OutputDevice):
         self.can_release = True
 
     async def release(self) -> None:
+        if not self.enabled:
+            return
+
         while not self.can_release:
             await asyncio.sleep(0.01)
         logger.info(f"-> ScreenOutputDevice Release {self.release_lag}")
@@ -107,9 +136,12 @@ class ScreenCounterOutputDevice(OutputDevice):
 
     @property
     def enabled(self) -> bool:
-        return True  # type: ignore
+        return False  # type: ignore
 
     async def shutter(self) -> None:
+        if not self.enabled:
+            return
+
         self.active = True
         logger.info(f"-> ScreenCounterOutputDevice Shutter {self.shutter_lag}")
         start = time.monotonic()
@@ -121,6 +153,9 @@ class ScreenCounterOutputDevice(OutputDevice):
         logger.info(f"<- ScreenCounterOutputDevice Shutter {self.shutter_lag}")
 
     async def release(self) -> None:
+        if not self.enabled:
+            return
+
         logger.info(f"-> ScreenCounterOutputDevice Release {self.release_lag}")
         await asyncio.sleep(self.release_lag / 1000)
         self.active = False
@@ -134,13 +169,27 @@ class PinOutputDevice(OutputDevice):
         super().__init__(config)
         self.pin = pin
         self.inverted = inverted
-        GPIO.setup(pin, GPIO.OUT)
+        if self.enabled:
+            self.enable()
 
     @property
     def enabled(self) -> bool:
         return self.config.led_blink_enable.value  # type: ignore
 
+    def enable(self) -> None:
+        super().enable()
+
+        GPIO.setup(self.pin, GPIO.OUT)
+
+    def disable(self) -> None:
+        super().disable()
+
+        GPIO.cleanup(self.pin)
+
     async def shutter(self) -> None:
+        if not self.enabled:
+            return
+
         self.can_release = False
         logger.info(f"-> LedOutputDevice Shutter {self.shutter_lag}")
         await asyncio.sleep(self.shutter_lag / 1000)
@@ -149,6 +198,9 @@ class PinOutputDevice(OutputDevice):
         self.can_release = True
 
     async def release(self) -> None:
+        if not self.enabled:
+            return
+
         while not self.can_release:
             await asyncio.sleep(0.01)
         logger.info(f"-> LedOutputDevice Release {self.release_lag}")
@@ -253,7 +305,17 @@ class GPhotoOutputDevice(OutputDevice):
     def __init__(self, config: Config):
         super().__init__(config)
         self.client = None
+
+        if self.enabled:
+            self.enable()
+
+    def enable(self) -> None:
+        super().enable()
         self.camera = gp.Camera()
+
+    def disable(self) -> None:
+        super().disable()
+        self.camera = None
 
     async def search(self) -> None:
         logger.debug("GPhotoOutputDevice.search")
@@ -271,6 +333,9 @@ class GPhotoOutputDevice(OutputDevice):
             break
 
     async def shutter(self) -> None:
+        if not self.enabled:
+            return
+
         # config = self.camera.get_single_config("shutterspeed")
         # shutterspeed = config.get_value()
         # config = self.camera.get_single_config("iso")
@@ -290,6 +355,9 @@ class GPhotoOutputDevice(OutputDevice):
         self.can_release = True
 
     async def release(self) -> None:
+        if not self.enabled:
+            return
+
         logger.info(f"-> GPhotoOutputDevice Release {self.release_lag}")
         await asyncio.sleep(self.release_lag / 1000)
         logger.info(f"<- GPhotoOutputDevice Release {self.release_lag}")

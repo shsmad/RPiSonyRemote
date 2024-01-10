@@ -6,6 +6,8 @@ from typing import Any
 
 import RPi.GPIO as GPIO
 
+from libs.eventbus import EventBusDefaultDict
+from libs.eventtypes import ConfigChangeEvent
 from menu.data import Config
 
 logger = logging.getLogger(__name__)
@@ -22,12 +24,23 @@ class InputDevice:
 
     def __init__(self, config: Config):
         self.config = config
+        self.bus = EventBusDefaultDict()
+        self.bus.add_listener(ConfigChangeEvent, self.on_config_change)
 
     def set_notify_callback(self, callback: Any) -> None:
         self.notify_callback = callback
 
     def current(self) -> int:
         return self._last_value
+
+    def enable(self) -> None:
+        pass
+
+    def disable(self) -> None:
+        pass
+
+    def on_config_change(self, event: ConfigChangeEvent) -> None:
+        pass
 
 
 class GPIODevice(InputDevice):
@@ -36,8 +49,18 @@ class GPIODevice(InputDevice):
 
         self.loop = asyncio.get_event_loop()
         self.pin = pin
+
+    def enable(self) -> None:
+        super().enable()
+
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.add_event_detect(self.pin, GPIO.BOTH, callback=self.callback)  # , bouncetime=self.bouncetime)
+
+    def disable(self) -> None:
+        super().disable()
+
+        GPIO.remove_event_detect(self.pin)
+        GPIO.cleanup(self.pin)
 
     def callback(self, channel: int) -> None:
         logger.debug(f"GPIODevice.callback on {channel}")
@@ -47,7 +70,8 @@ class GPIODevice(InputDevice):
 class DigitalInputDevice(GPIODevice):
     def __init__(self, config: Config, pin: int):
         super().__init__(config, pin)
-        GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        if self.enabled:
+            self.enable()
 
     @property
     def mode(self) -> IDeviceTriggerMode:
@@ -70,10 +94,8 @@ class DigitalInputDevice(GPIODevice):
             return
 
         value = GPIO.input(self.pin)
-        if value != self._last_value:
-            logger.debug(
-                f"DigitalInputDevice.callback on {channel}: value: {value}, last value: {self._last_value}, mode {self.mode}"
-            )
+        if value != self._last_value and self.notify_callback is not None:
+            logger.debug(f"DigitalInputDevice.callback on {channel}: {self._last_value} -> {value}, mode {self.mode}")
             self._last_value = value
 
             return_value: bool = (
