@@ -12,7 +12,7 @@ from libs.eventtypes import ConfigChangeEvent, HWInfoUpdateEvent, MenuClickEvent
 from libs.fontawesome import fa
 
 # from libs.hwinfo import HWInfo
-from utils import TaskTimer, circular_increment
+from libs.utils import TaskTimer, circular_increment
 
 from .data import Config, MenuItem, ParamType, create_menu_tree
 
