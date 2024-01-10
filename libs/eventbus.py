@@ -8,7 +8,7 @@ from typing import Any, Callable
 from typing_extensions import Never
 
 from libs.eventtypes import Event
-from utils import Singleton
+from libs.utils import Singleton
 
 """
 Here's a breakdown of the Coroutine[Any, Any, Any]:

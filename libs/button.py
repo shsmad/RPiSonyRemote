@@ -5,7 +5,7 @@ import RPi.GPIO as GPIO
 
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import ButtonClickEvent, ButtonHoldEvent, ButtonPressEvent, ButtonStepEvent, Event
-from utils import RepeatTimer
+from libs.utils import RepeatTimer
 
 KEY_DOWN = GPIO.LOW
 KEY_UP = GPIO.HIGH
