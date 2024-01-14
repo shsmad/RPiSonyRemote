@@ -1,7 +1,18 @@
 import math
 
+from dataclasses import dataclass
+from typing import Optional
+
 # https://zerenesystems.com/cms/stacker/docs/tables/macromicrodof
 # https://zerenesystems.com/cms/stacker/docs/dofcalculator
+
+
+@dataclass
+class DOFResult:
+    step_size_suggested: float
+    recommendation: str
+    dof_classic: Optional[float] = None
+    dof_optic: Optional[float] = None
 
 
 def getDOFFromNA(NA: float) -> float:
@@ -20,258 +31,150 @@ def getDOFFromNA(NA: float) -> float:
     return DOF
 
 
-class MacroCalculator:
-    sensor_width = 0.0
-    subject_width = 0.0
-    magnification = 1.0
-    lens_aperture = 0.0
-    pupil_ratio = 1.0
-    effective_fnumber = 0.0
-    sensor_width_px = 0.0
-    pixel_width = 0.0
-    coc_width_px = 3.0
-    coc_width_mm = 0.0
-    dof_classic = 0.0
-    dof_optic = 0.0
-    step_overlap = 0.0
-    step_size_suggested = 0.0
+def calculate_suggested_step_size(
+    dof_classic: float = 0.0, dof_optic: float = 0.0, step_overlap: float = 0.0
+) -> DOFResult:
+    rec_DOF = dof_classic or 0.0
+    if dof_optic and dof_optic > rec_DOF:
+        rec_DOF = dof_optic
+
+    frac = 1 - step_overlap if step_overlap else 1.0
     recommendation = ""
 
-    def getPupilFactor(self) -> float:
-        return self.pupil_ratio or 1.0
-        #   const pupilRatioType = PupilRatioTypeField.value;
-        #   const pupilRatio = PupilRatioField.value;
-        #   let pupilFactor = 1.0;
-        #   if (hasValue(pupilRatio)) {
-        #     pupilFactor = pupilRatio;
-        #     if (pupilRatioType == "FrontOverRear") {
-        #       pupilFactor = 1.0/pupilFactor;
-        #     }
-        #   }
-        #   return pupilFactor;
+    if rec_DOF > 0:
+        step_size_suggested = rec_DOF * frac
+        if dof_classic and dof_optic:
+            recommendation = "Aperture is near optimum for specified CoC"
+            if dof_classic > dof_optic * 1.2:
+                recommendation = (
+                    "Resolution is limited by sensor or CoC setting, consider a narrower aperture or omit CoC"
+                )
 
-    def calculateEffectiveAperture(self) -> None:
-        #   const lensAperture = LensApertureField.value;
-        #   const apertureType = LensApertureTypeField.value;
-        #   const magnification = MagnificationField.value;
-        #   if (apertureType == "NA") {
-        #     if (hasValue(lensAperture) && lensAperture > 0.0 && hasValue(magnification)) {
-        #       const NA = lensAperture;
-        #       setFieldValue(EffectiveFNumberField,magnification/(2*NA));
-        #       EffectiveFNumberSet();
-        #     }
-        #   } else if (apertureType == "EffectiveFNumber") {
-        #     if (hasValue(lensAperture)) {
-        #       setFieldValue(EffectiveFNumberField,lensAperture);
-        #       EffectiveFNumberSet();
-        #     }
-        #   } else { // assume normal F-number
-        pupil_factor = self.getPupilFactor()
-        if self.lens_aperture:
-            mag = self.magnification or 0.0
-            self.effective_fnumber = self.lens_aperture * (mag / pupil_factor + 1.0)
-            self.EffectiveFNumberSet()
+            elif dof_classic < dof_optic / 1.2:
+                recommendation = "Resolution is limited by diffraction, consider a wider aperture"
 
-    def SensorWidthSet(self) -> None:
-        self.calculateMagnification()
-        self.calculateSubjectWidth()
-        self.calculatePixelWidth()
+    else:
+        step_size_suggested = 0
 
-    def SubjectWidthSet(self) -> None:
-        self.calculateMagnification()
+    return DOFResult(step_size_suggested, recommendation, dof_classic, dof_optic)
 
-    def MagnificationSet(self) -> None:
-        self.calculateSubjectWidth()
-        self.calculateEffectiveAperture()
-        self.calculateClassicDOF()
 
-    def LensApertureSet(self) -> None:
-        self.calculateEffectiveAperture()
-        self.calculateWaveOpticsDOF()
+def get_pupil_factor(pupil_ratio: Optional[float] = None) -> float:
+    return pupil_ratio or 1.0
+    #   const pupilRatioType = PupilRatioTypeField.value;
+    #   const pupilRatio = PupilRatioField.value;
+    #   let pupilFactor = 1.0;
+    #   if (hasValue(pupilRatio)) {
+    #     pupilFactor = pupilRatio;
+    #     if (pupilRatioType == "FrontOverRear") {
+    #       pupilFactor = 1.0/pupilFactor;
+    #     }
+    #   }
+    #   return pupilFactor;
 
-    def PupilRatioSet(self) -> None:
-        self.calculateEffectiveAperture()
 
-    def EffectiveFNumberSet(self) -> None:
-        self.calculateClassicDOF()
-        self.calculateWaveOpticsDOF()
+def calculate_effective_aperture(
+    pupil_factor: float = 1.0, magnification: float = 0.0, lens_aperture: float = 0.0
+) -> float:
+    #   const lensAperture = LensApertureField.value;
+    #   const apertureType = LensApertureTypeField.value;
+    #   const magnification = MagnificationField.value;
+    #   if (apertureType == "NA") {
+    #     if (hasValue(lensAperture) && lensAperture > 0.0 && hasValue(magnification)) {
+    #       const NA = lensAperture;
+    #       setFieldValue(EffectiveFNumberField,magnification/(2*NA));
+    #       EffectiveFNumberSet();
+    #     }
+    #   } else if (apertureType == "EffectiveFNumber") {
+    #     if (hasValue(lensAperture)) {
+    #       setFieldValue(EffectiveFNumberField,lensAperture);
+    #       EffectiveFNumberSet();
+    #     }
+    #   } else { // assume normal F-number
 
-    def SensorWidthPixelsSet(self) -> None:
-        self.calculatePixelWidth()
+    # pupil_factor = getPupilFactor()
+    if lens_aperture:
+        return lens_aperture * ((magnification or 0.0) / pupil_factor + 1.0)
 
-    def PixelWidthSet(self) -> None:
-        self.calculateCOCWidth()
+    return lens_aperture
 
-    def calculatePixelWidth(self) -> None:
-        if self.sensor_width and self.sensor_width_px:
-            self.pixel_width = self.sensor_width / self.sensor_width_px
-            self.PixelWidthSet()
 
-    def CoCWidthPixelsSet(self) -> None:
-        self.calculateCOCWidth()
+def calculate_classic_DOF(
+    effective_fnumber: float = 0.0, magnification: float = 0.0, coc_width_mm: float = 0.0
+) -> float:
+    if effective_fnumber and magnification and coc_width_mm and magnification > 0.0:
+        return 2 * coc_width_mm * effective_fnumber / magnification**2
+    return 0.0
 
-    def calculateCOCWidth(self) -> None:
-        if self.pixel_width and self.coc_width_px:
-            self.coc_width_mm = self.pixel_width * self.coc_width_px
-            self.CoCWidthmmSet()
 
-    def CoCWidthmmSet(self) -> None:
-        if not self.coc_width_mm:
-            self.dof_classic = 0
-            self.DOFClassicSet()
-            self.calculateSuggestedStepSize()
+def calculate_wave_optics_DOF(effective_fnumber: float = 0.0, magnification: float = 0.0) -> float:
+    #   const lensAperture = LensApertureField.value;
+    #   const apertureType = LensApertureTypeField.value;
+    #   const effectiveAperture = EffectiveFNumberField.value;
+    #   const magnification = MagnificationField.value;
 
-        self.calculateClassicDOF()
+    if effective_fnumber and magnification and magnification > 0.0:
+        NA = 1 / (2 * (effective_fnumber / magnification))
+        dof_optic = getDOFFromNA(NA)
+    else:
+        dof_optic = 0.0
 
-    def calculateClassicDOF(self) -> None:
-        if self.effective_fnumber and self.magnification and self.coc_width_mm and self.magnification > 0.0:
-            self.dof_classic = (
-                2 * self.coc_width_mm * self.effective_fnumber / (self.magnification * self.magnification)
-            )
-            self.DOFClassicSet()
+    return dof_optic
+    # if (hasValue(lensAperture) && apertureType == "NA") {
+    #     const NA = lensAperture;
+    #     setDOFWaveOptics(getDOFFromNA(NA));
+    # } else if (hasValue(effectiveAperture) && hasValue(magnification)) {
+    #     if (magnification > 0.0) {
+    #         const feff = effectiveAperture;
+    #         const NA = 1/(2*(feff/magnification));
+    #         setDOFWaveOptics(getDOFFromNA(NA));
+    #     }
+    # } else {
+    #     setDOFWaveOptics("");
+    # }
 
-    def DOFClassicSet(self) -> None:
-        self.calculateSuggestedStepSize()
 
-    def calculateWaveOpticsDOF(self) -> None:
-        #   const lensAperture = LensApertureField.value;
-        #   const apertureType = LensApertureTypeField.value;
-        #   const effectiveAperture = EffectiveFNumberField.value;
-        #   const magnification = MagnificationField.value;
+def calc(
+    magnification: float,
+    lens_aperture: float,
+    coc_width_mm: Optional[float] = None,
+    sensor_width: Optional[float] = None,
+    sensor_width_px: Optional[float] = None,
+    coc_width_px: Optional[float] = 3,
+) -> Optional[DOFResult]:
+    # usage 1: magnification + lens_aperture
+    # usage 2: magnification + lens_aperture + coc_width_mm
+    # usage 3: magnification + lens_aperture + sensor_width + sensor_width_px + coc_width_px
+    if lens_aperture < 0 or magnification < 0:
+        return None
 
-        if self.effective_fnumber and self.magnification and self.magnification > 0.0:
-            NA = 1 / (2 * (self.effective_fnumber / self.magnification))
-            self.dof_optic = getDOFFromNA(NA)
-        else:
-            self.dof_optic = 0
+    effective_fnumber = calculate_effective_aperture(
+        pupil_factor=get_pupil_factor(), magnification=magnification, lens_aperture=lens_aperture
+    )
 
-        self.DOFWaveOpticsSet()
-        # if (hasValue(lensAperture) && apertureType == "NA") {
-        #     const NA = lensAperture;
-        #     setDOFWaveOptics(getDOFFromNA(NA));
-        # } else if (hasValue(effectiveAperture) && hasValue(magnification)) {
-        #     if (magnification > 0.0) {
-        #         const feff = effectiveAperture;
-        #         const NA = 1/(2*(feff/magnification));
-        #         setDOFWaveOptics(getDOFFromNA(NA));
-        #     }
-        # } else {
-        #     setDOFWaveOptics("");
-        # }
+    dof_optic = calculate_wave_optics_DOF(effective_fnumber=effective_fnumber, magnification=magnification)
 
-    def DOFWaveOpticsSet(self) -> None:
-        # autoAdvance = false;
-        self.calculateSuggestedStepSize()
+    if sensor_width and sensor_width_px and coc_width_px:
+        pixel_width = sensor_width / sensor_width_px
+        coc_width_mm = pixel_width * coc_width_px
 
-    def StepOverlapSet(self) -> None:
-        self.calculateSuggestedStepSize()
+    if coc_width_mm:
+        dof_classic = calculate_classic_DOF(
+            effective_fnumber=effective_fnumber, magnification=magnification, coc_width_mm=coc_width_mm
+        )
+    else:
+        dof_classic = 0.0
 
-    def calculateSuggestedStepSize(self) -> None:
-        recDOF = self.dof_classic or 0.0
-        if self.dof_optic and self.dof_optic > recDOF:
-            recDOF = self.dof_optic
-
-        frac = 1 - self.step_overlap if self.step_overlap else 1.0
-        self.recommendation = ""
-
-        if recDOF > 0:
-            self.step_size_suggested = recDOF * frac
-            if self.dof_classic and self.dof_optic:
-                self.recommendation = "Aperture is near optimum for specified CoC"
-                if self.dof_classic > self.dof_optic * 1.2:
-                    self.recommendation = (
-                        "Resolution is limited by sensor or CoC setting, consider a narrower aperture or omit CoC"
-                    )
-
-                elif self.dof_classic < self.dof_optic / 1.2:
-                    self.recommendation = "Resolution is limited by diffraction, consider a wider aperture"
-
-        else:
-            self.step_size_suggested = 0
-        self.StepSizeSuggestedSet()
-
-    def StepSizeSuggestedSet(self) -> None:
-        pass
-
-    def calculateMagnification(self) -> None:
-        if self.sensor_width and self.subject_width and self.subject_width > 0.0:
-            oldmag = self.magnification
-            newmag = self.sensor_width / self.subject_width
-            # fuzz to avoid recursion
-            if oldmag == 0.0 or abs(1.0 - newmag / oldmag) > 0.0001:
-                self.magnification = newmag
-                self.MagnificationSet()
-
-    def calculateSubjectWidth(self) -> None:
-        if self.sensor_width and self.magnification and self.magnification > 0:
-            oldSubjectWidth = self.subject_width
-            newSubjectWidth = self.sensor_width / self.magnification
-            # avoid recursion
-            if oldSubjectWidth == 0 or abs(1.0 - newSubjectWidth / oldSubjectWidth) > 0.0001:
-                self.subject_width = newSubjectWidth
-                self.SubjectWidthSet()
-
-    def Refresh(self) -> None:
-        self.SensorWidthSet()
-        self.SubjectWidthSet()
-        self.MagnificationSet()
-        self.LensApertureSet()
-        # self.LensApertureTypeSet()
-        self.PupilRatioSet()
-        # self.PupilRatioTypeSet()
-        self.EffectiveFNumberSet()
-        self.SensorWidthPixelsSet()
-        self.PixelWidthSet()
-        self.CoCWidthPixelsSet()
-        self.CoCWidthmmSet()
-        self.DOFClassicSet()
-        self.DOFWaveOpticsSet()
-        self.StepOverlapSet()
-        self.StepSizeSuggestedSet()
-        # self.EvaluationTextSet()
-
-    def calc(self, magnification: float, lens_aperture: float) -> tuple[float, str]:
-        self.set_magnification_and_aperture(magnification, lens_aperture)
-        return (self.step_size_suggested, self.recommendation)
-
-    def calc2(self, magnification: float, lens_aperture: float, coc_width_mm: float) -> tuple[float, str]:
-        self.set_magnification_and_aperture(magnification, lens_aperture)
-        self.coc_width_mm = coc_width_mm
-        self.CoCWidthmmSet()
-        return (self.step_size_suggested, self.recommendation)
-
-    def calc3(
-        self,
-        magnification: float,
-        lens_aperture: float,
-        sensor_width: float,
-        sensor_width_px: float,
-        coc_width_px: float,
-    ) -> tuple[float, str]:
-        self.set_magnification_and_aperture(magnification, lens_aperture)
-        self.sensor_width = sensor_width
-        self.SensorWidthSet()
-        self.sensor_width_px = sensor_width_px
-        self.SensorWidthPixelsSet()
-        self.coc_width_px = coc_width_px
-        self.CoCWidthPixelsSet()
-        return (self.step_size_suggested, self.recommendation)
-
-    def set_magnification_and_aperture(self, magnification: float, lens_aperture: float) -> None:
-        self.magnification = magnification
-        self.MagnificationSet()
-        self.lens_aperture = lens_aperture
-        self.LensApertureSet()
+    return calculate_suggested_step_size(dof_classic=dof_classic, dof_optic=dof_optic, step_overlap=0)
 
 
 if __name__ == "__main__":
     # CoC width = 3 * pixel_width = 3 * (sensor_width / sensor_width_px)
-    calc = MacroCalculator()
-    print(calc.calc(magnification=1.0, lens_aperture=5.6))
+    print(calc(magnification=1.0, lens_aperture=5.6))
 
-    print(calc.calc2(magnification=1.0, lens_aperture=5.6, coc_width_mm=0.03))
-    print(calc.calc2(magnification=1.0, lens_aperture=5.6, coc_width_mm=0.0175))
-    print(calc.calc2(magnification=1.0, lens_aperture=8, coc_width_mm=0.0175))
+    print(calc(magnification=1.0, lens_aperture=5.6, coc_width_mm=0.03))
+    print(calc(magnification=1.0, lens_aperture=5.6, coc_width_mm=0.0175))
+    print(calc(magnification=1.0, lens_aperture=8, coc_width_mm=0.0175))
 
-    print(calc.calc3(magnification=1.0, lens_aperture=5.6, sensor_width=35, sensor_width_px=6000, coc_width_px=3))
-    print(calc.calc3(magnification=1.0, lens_aperture=8, sensor_width=35, sensor_width_px=6000, coc_width_px=3))
+    print(calc(magnification=1.0, lens_aperture=5.6, sensor_width=35, sensor_width_px=6000, coc_width_px=3))
+    print(calc(magnification=1.0, lens_aperture=8, sensor_width=35, sensor_width_px=6000, coc_width_px=3))
