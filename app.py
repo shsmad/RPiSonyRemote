@@ -6,12 +6,19 @@ import signal
 
 from concurrent.futures import ThreadPoolExecutor
 
-from luma.core.interface.serial import i2c
-from luma.oled.device import ssd1306
+from luma.core.interface.serial import spi
+from luma.oled.device import sh1106
 
 from libs.button import Button
 from libs.device.input import DigitalInputDevice
-from libs.device.output import BluetoothOuputDevice, GPhotoOutputDevice, ScreenCounterOutputDevice
+from libs.device.output import (
+    BluetoothOuputDevice,
+    ConsoleOutputDevice,
+    GPhotoOutputDevice,
+    PinOutputDevice,
+    ScreenCounterOutputDevice,
+    ScreenOutputDevice,
+)
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import (
     ButtonClickEvent,
@@ -48,8 +55,9 @@ class Application:
 
         self.setup_loop(loop_debug, loop_slow_callback_duration)
 
-        serial = i2c(port=1, address=0x3C)
-        device = ssd1306(serial)
+        # serial = i2c(port=1, address=0x3C)
+        serial = spi(device=0, port=0)
+        device = sh1106(serial)
         self.oled_menu = OledMenu(None, oled=device, config=self.config)
 
         self.setup_devices()
@@ -74,18 +82,16 @@ class Application:
 
     def setup_devices(self) -> None:
         di_i = DigitalInputDevice(self.config, DIGITAL_INPUT)
-        # ConsoleOutputDevice(
-        #     shutter_lag=config.shutter_lag.value,
-        #     release_lag=config.release_lag.value,
-        # ),
-        # scr_o = ScreenOutputDevice(config=self.config, canvas=self.oled_menu.draw)
-        scrc_o = ScreenCounterOutputDevice(config=self.config, canvas=self.oled_menu.draw)
-        # pin_o = PinOutputDevice(config=self.config, pin=RPI0_LED, inverted=True)
-        self.bt_o = BluetoothOuputDevice(config=self.config)
 
+        c_o = ConsoleOutputDevice(config=self.config)
+        scr_o = ScreenOutputDevice(config=self.config, canvas=self.oled_menu.draw)
+        scrc_o = ScreenCounterOutputDevice(config=self.config, canvas=self.oled_menu.draw)
+
+        led_o = PinOutputDevice(config=self.config, pin=RPI0_LED, inverted=True)
+        self.bt_o = BluetoothOuputDevice(config=self.config)
         gphoto_o = GPhotoOutputDevice(config=self.config)
 
-        self.router = Router(input_devices=[di_i], output_devices=[scrc_o, gphoto_o])
+        self.router = Router(input_devices=[di_i], output_devices=[c_o, scr_o, scrc_o, led_o, self.bt_o, gphoto_o])
 
     def setup_buttons(self) -> None:
         self.buttons = [Button(BUTTON_LEFT), Button(BUTTON_RIGHT), Button(BUTTON_ENTER)]

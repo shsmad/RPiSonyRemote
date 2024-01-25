@@ -12,7 +12,7 @@ from libs.eventtypes import ConfigChangeEvent, HWInfoUpdateEvent, MenuClickEvent
 from libs.fontawesome import fa
 
 # from libs.hwinfo import HWInfo
-from libs.utils import TaskTimer, circular_increment
+from libs.utils import TaskTimer, circular_increment, split_list
 
 from .data import Config, MenuItem, ParamType, create_menu_tree
 
@@ -47,7 +47,9 @@ class OledMenu:
         self.config = config
         self.menuLevel = 0
 
-        self.menuItems = create_menu_tree(config=self.config)
+        self.menu_root = create_menu_tree(config=self.config)
+        self.menu_current: MenuItem = self.menu_root
+        self.menu_items = None
         self._oled = oled
         self.draw = canvas(self._oled)
 
@@ -142,40 +144,41 @@ class OledMenu:
         # //     oled.fastLineV(oledLevel, 25, 31, OLED_STROKE);
         # // }
 
-    def draw_menu_screen(self, position: int) -> None:
+    def draw_menu_screen_ex(self, current_item: MenuItem) -> None:
         with self.draw as draw:
             draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
-            font_16 = FONTS[16]
-            margin_x = (self._oled.width - font_16.getlength(self.menuItems[position].title)) / 2
+            font_14 = FONTS[14]
+            margin_x = (self._oled.width - font_14.getlength(current_item.get_title())) / 2
             draw.text(
                 (margin_x, 1),
-                self.menuItems[position].get_title(),
+                current_item.get_title(),
                 fill="white",
-                font=font_16,
+                font=font_14,
             )
 
-            padding_x = (self._oled.width - len(self.menuItems) * 24) / 2
-            icon_items = [(idx, item) for idx, item in enumerate(self.menuItems) if item.get_icon()]
+            padding_x = (self._oled.width - 3 * 24) / 2
+            icon_items = [item for item in current_item.parent.children if item.get_icon()]
 
-            for idx, item in icon_items:
-                text, font = fa(item.get_icon(), 16)
-                draw.text((idx * 24 + padding_x + 6, 32 + 4), text, fill="white", font=font)
+            icon_items_rows = split_list(icon_items, 3)
 
-                if idx == position:
-                    draw.rounded_rectangle(
-                        (
-                            idx * 24 + padding_x,
-                            32,
-                            idx * 24 + 24 + padding_x,
-                            32 + 24 - 1,
-                        ),
-                        radius=4,
-                        outline="white",
-                    )
+            for row_id, row in enumerate(icon_items_rows):
+                for item_id, item in enumerate(row):
+                    text, font = fa(item.get_icon(), 16)
+                    draw.text((item_id * 24 + padding_x + 6, 16 + 4 + 24 * row_id), text, fill="white", font=font)
 
-    def draw_submenu_screen(self, parent_position: int, position: int) -> None:
-        current_item = self.menuItems[parent_position].children[position]
+                    if item is current_item:
+                        draw.rounded_rectangle(
+                            (
+                                item_id * 24 + padding_x,
+                                16 + 24 * row_id,
+                                item_id * 24 + 24 + padding_x,
+                                16 + 24 - 1 + 24 * row_id,
+                            ),
+                            radius=4,
+                            outline="white",
+                        )
 
+    def draw_submenu_screen(self, current_item: MenuItem) -> None:
         try:
             with canvas(self._oled) as draw:
                 draw.rectangle(self._oled.bounding_box, outline="black", fill="black")
@@ -209,6 +212,8 @@ class OledMenu:
     def reset_to_splashscreen(self) -> None:
         self._t_reset_to_splashscreen.stop()
         self.menuLevel = 0
+        while self.menu_current.parent:
+            self.menu_current = self.menu_current.parent
         self.draw_splash_screen()
 
     async def on_menu_click(self, event: MenuClickEvent) -> None:
@@ -227,23 +232,19 @@ class OledMenu:
         if self.menuLevel == 1:
             self.menuLevel = 2
             self._t_reset_to_splashscreen.stop()
-            self._current_menu_position[self.menuLevel] = 0
-            self.draw_submenu_screen(
-                self._current_menu_position[self.menuLevel - 1],
-                self._current_menu_position[self.menuLevel],
-            )
+            self.menu_current = self.menu_current.children[0]
+            self.draw_submenu_screen(self.menu_current)
             return
 
         if self.menuLevel == 2:
-            current_item = self.menuItems[self._current_menu_position[self.menuLevel - 1]].children[
-                self._current_menu_position[self.menuLevel]
-            ]
+            current_item = self.menu_current
 
             param_type = current_item.get_param_type()
 
             if param_type == ParamType.EXIT:
                 self.menuLevel = 1
-                self.draw_menu_screen(self._current_menu_position[self.menuLevel])
+                self.menu_current = self.menu_current.parent
+                self.draw_menu_screen_ex(self.menu_current)
                 self._t_reset_to_splashscreen.start()
                 return
 
@@ -254,27 +255,24 @@ class OledMenu:
                 return
 
         if self.menuLevel == 3:
+            current_item = self.menu_current
             self.menuLevel = 2
-            self.draw_submenu_screen(
-                self._current_menu_position[self.menuLevel - 1],
-                self._current_menu_position[self.menuLevel],
-            )
+            self.draw_submenu_screen(self.menu_current)
             return
 
     def on_key_press_splashscreen(self) -> None:
         self.menuLevel = 1
-        self.draw_menu_screen(self._current_menu_position[self.menuLevel])
+        self.menu_current = self.menu_current.children[0]
+        self.draw_menu_screen_ex(self.menu_current)
         self._t_reset_to_splashscreen.start()
 
     async def on_menu_hold(self, event: MenuHoldEvent) -> None:
         # [pin, steps, hold] = event
 
-        if self.menuLevel == 3:
+        current_item = self.menu_current
+        if self.menuLevel == 3 and current_item.get_param_type() in (ParamType.INT, ParamType.FLOAT):
             self._edit_precision = circular_increment(self._edit_precision, 0, 2, 1)
             try:
-                current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
-                    self._current_menu_position[self.menuLevel - 1]
-                ]
                 if current_item.get_param_type() in (
                     ParamType.BOOL,
                     ParamType.INT,
@@ -285,24 +283,8 @@ class OledMenu:
                 logger.exception(e)
 
     async def on_menu_rotate(self, event: MenuRotateEvent) -> None:
-        menu_length = 0
-        if self.menuLevel == 1:
-            menu_length = len(self.menuItems) - 1
-        elif self.menuLevel == 2:
-            parent_menu_item = self.menuItems[self._current_menu_position[self.menuLevel - 1]]
-            menu_length = len(parent_menu_item.children) - 1
-
-        if self.menuLevel < 3:
-            self._current_menu_position[self.menuLevel] = circular_increment(
-                self._current_menu_position[self.menuLevel],
-                0,
-                menu_length,
-                event.direction,
-            )
         if self.menuLevel == 3:
-            current_item = self.menuItems[self._current_menu_position[self.menuLevel - 2]].children[
-                self._current_menu_position[self.menuLevel - 1]
-            ]
+            current_item = self.menu_current
 
             param_type = current_item.get_param_type()
 
@@ -319,7 +301,10 @@ class OledMenu:
 
             if param_type == ParamType.INT:
                 delta = int_delta(event.direction, self._edit_precision)
-                current_item.config_item.value = current_item.config_item.value + delta
+                try:
+                    current_item.config_item.value = current_item.config_item.value + delta
+                except Exception as e:
+                    logger.exception(e)
                 draw_item_editor(self._oled, current_item, self._edit_precision)
                 return
 
@@ -330,15 +315,14 @@ class OledMenu:
                 return
 
         if self.menuLevel == 1:
-            self.draw_menu_screen(self._current_menu_position[self.menuLevel])
+            self.menu_current = self.menu_current.next if event.direction == 1 else self.menu_current.prev
+            self.draw_menu_screen_ex(self.menu_current)
             self._t_reset_to_splashscreen.start()
             return
 
         if self.menuLevel == 2:
-            self.draw_submenu_screen(
-                parent_position=self._current_menu_position[self.menuLevel - 1],
-                position=self._current_menu_position[self.menuLevel],
-            )
+            self.menu_current = self.menu_current.next if event.direction == 1 else self.menu_current.prev
+            self.draw_submenu_screen(self.menu_current)
             return
 
 
@@ -377,7 +361,7 @@ def draw_item_editor(screen: LumaDevice, item: MenuItem, precision: int = 0) -> 
         x = screen.width - font_16.getlength(text)
         letter_width = font_16.getlength("0")
         draw.rectangle(
-            [(x, 48), (screen.width - letter_width * precision, 63)],
+            [(min(x, screen.width - letter_width * precision), 48), (screen.width - letter_width * precision, 63)],
             outline="white",
             fill="white",
         )
@@ -392,7 +376,7 @@ def draw_item_editor(screen: LumaDevice, item: MenuItem, precision: int = 0) -> 
         draw.text((x, 48), selected_part, fill="black", outline="white", font=font_16)
         if rest_part:
             draw.text(
-                (screen.width - letter_width * precision, 48),
+                (screen.width - letter_width * len(rest_part), 48),
                 rest_part,
                 fill="white",
                 font=font_16,

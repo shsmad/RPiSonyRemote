@@ -28,6 +28,7 @@ class OutputDevice:
         self.can_release = True
         self.bus = EventBusDefaultDict()
         self.bus.add_listener(ConfigChangeEvent, self.on_config_change)
+        logger.info(f"Created output device {self.__class__.__name__}")
 
     @property
     def shutter_lag(self) -> int:
@@ -53,7 +54,7 @@ class OutputDevice:
     def disable(self) -> None:
         pass
 
-    def on_config_change(self, event: ConfigChangeEvent) -> None:
+    async def on_config_change(self, event: ConfigChangeEvent) -> None:
         pass
 
 

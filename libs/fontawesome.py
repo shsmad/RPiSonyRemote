@@ -1966,6 +1966,7 @@ _codes.update(
         "flower-tulip": {"label": "Flower Tulip", "styles": ["solidpro"], "unicode": "\uf801"},
         "aperture": {"label": "Aperture", "styles": ["solidpro"], "unicode": "\ue2df"},
         "reel": {"label": "Reel", "styles": ["solidpro"], "unicode": "\ue238"},
+        "input-numeric": {"label": "Input Numeric", "styles": ["solidpro"], "unicode": "\ue1bd"},
     }
 )
 

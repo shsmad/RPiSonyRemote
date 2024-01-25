@@ -106,3 +106,7 @@ class TaskTimer:
 
     def __repr__(self) -> str:
         return f"TaskTimer(interval={self.interval}, callback={self.callback})"
+
+
+def split_list(lst: list[Any], n: int) -> list[list[Any]]:
+    return [lst[i : i + n] for i in range(0, len(lst), n)]

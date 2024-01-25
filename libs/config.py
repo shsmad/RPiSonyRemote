@@ -1,7 +1,7 @@
 import logging
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar, cast
 
 from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import ConfigChangeEvent
@@ -32,8 +32,11 @@ class ConfigMeta(type):
                 attr_value.key = attr_name
 
 
-class ConfigItem:
-    def __init__(self, title: str, param_type: ParamType, default_value: Any, icon: Optional[str] = None) -> None:
+T = TypeVar("T")
+
+
+class ConfigItem(Generic[T]):
+    def __init__(self, title: str, param_type: ParamType, default_value: T, icon: Optional[str] = None) -> None:
         self.key: Optional[str] = None
         self.title = title
         self.param_type = param_type
@@ -43,27 +46,30 @@ class ConfigItem:
         self.bus = EventBusDefaultDict()  # noqa: F821
 
     @property
-    def value(self) -> Any:
+    def value(self) -> T:
         try:
             from_db = self.storage.get(self.key)
             if from_db is None:
                 return self.default_value
 
             if self.param_type == ParamType.BOOL:
-                return bool(from_db)
+                return cast(T, bool(from_db))
             elif self.param_type == ParamType.INT:
-                return int(from_db)
+                return cast(T, int(from_db))
             elif self.param_type == ParamType.FLOAT:
-                return float(from_db)
+                return cast(T, float(from_db))
             else:
-                return None
+                return cast(T, None)
         except Exception as e:
             logger.exception(e)
 
-        return self.storage.get(self.key, self.default_value)
+        return self.default_value
 
     @value.setter
-    def value(self, new_value: Any) -> None:
+    def value(self, new_value: T) -> None:
+        if not self.key:
+            return
+
         try:
             if self.param_type == ParamType.BOOL:
                 self.storage[self.key] = "1" if new_value else ""
@@ -75,38 +81,66 @@ class ConfigItem:
             logger.exception(e)
 
 
+class DummyConfigItem(ConfigItem[T]):
+    def __init__(self, title: str, param_type: ParamType, default_value: T, icon: Optional[str] = None) -> None:
+        super().__init__(title, param_type, default_value, icon)
+
+    @property
+    def value(self) -> T:
+        return self.default_value
+
+    @value.setter
+    def value(self, new_value: T) -> None:
+        pass
+
+
 class Config(metaclass=ConfigMeta):
-    analog_trigger_enable = ConfigItem("A.Enable", ParamType.BOOL, False, "wave-sine")
-    analog_trigger_threshold = ConfigItem("A.Barrier", ParamType.INT, 200, "dial")
-    analog_trigger_direction = ConfigItem("A.Above", ParamType.BOOL, False, "arrow-up-from-dotted-line")
-    digital_trigger_enable = ConfigItem("D.Enable", ParamType.BOOL, True, "wave-square")
-    digital_trigger_direction = ConfigItem("D.Above", ParamType.BOOL, True, "arrow-up-from-dotted-line")
-    digital_emmitter_enable = ConfigItem("Emmitter", ParamType.BOOL, False, "signal-stream")
+    # inputs
+    # analog_trigger_enable = ConfigItem("A.Enable", ParamType.BOOL, False, "wave-sine")
+    # analog_trigger_threshold = ConfigItem("A.Barrier", ParamType.INT, 200, "dial")
+    # analog_trigger_direction = ConfigItem("A.Above", ParamType.BOOL, False, "arrow-up-from-dotted-line")
+    digital_trigger_enable = ConfigItem[bool]("D.Enable", ParamType.BOOL, True, "wave-square")
+    digital_trigger_direction = ConfigItem[bool]("D.Above", ParamType.BOOL, True, "arrow-up-from-dotted-line")
+    digital_emmitter_enable = ConfigItem[bool]("Emmitter", ParamType.BOOL, False, "signal-stream")
 
-    shutter_lag = ConfigItem("Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
-    release_lag = ConfigItem("Relz.Delay", ParamType.INT, 60, "chess-clock")
-    optron_enable = ConfigItem("Optron Out", ParamType.BOOL, True, "outlet")
-    oled_blink_enable = ConfigItem("Blink Screen", ParamType.BOOL, True, "display")
-    led_blink_enable = ConfigItem("Blink LED", ParamType.BOOL, True, "lightbulb")
-    trigger_read_timer = ConfigItem("ReadTimer", ParamType.INT, 60, "clock")
-    night_mode = ConfigItem("Night Mode", ParamType.BOOL, False, "moon")
-    hwinfo_enable = ConfigItem("HWInfo", ParamType.BOOL, False, "microchip")
-    bt_enable = ConfigItem("Enable BT", ParamType.BOOL, False, "bluetooth-b")
-    bt_bulb = ConfigItem("BULB mode", ParamType.BOOL, False, "hand-point-down")
-    bt_af_enable = ConfigItem("Enable AF", ParamType.BOOL, False, "users-viewfinder")
+    # outputs
+    optron_enable = ConfigItem[bool]("Pin Out", ParamType.BOOL, False, "outlet")
+    oled_blink_enable = ConfigItem[bool]("Blink Screen", ParamType.BOOL, False, "display")
+    led_timer_enable = ConfigItem[bool]("Screen Timer", ParamType.BOOL, False, "input-numeric")
+    led_blink_enable = ConfigItem[bool]("Blink LED", ParamType.BOOL, False, "lightbulb")
+    console_enable = ConfigItem[bool]("Console Log", ParamType.BOOL, False, "terminal")
+    gphoto_enable = ConfigItem[bool]("USB GPhoto", ParamType.BOOL, False, "plug")
 
-    macro_enable = ConfigItem("Use Macro", ParamType.BOOL, False, "flower-tulip")
-    macro_f = ConfigItem("Aperture", ParamType.INT, 0, "aperture")
-    macro_ratio = ConfigItem("Ratio", ParamType.FLOAT, 0, "magnifying-glass")
-    macro_step = ConfigItem("Step", ParamType.FLOAT, 0, "shoe-prints")
-    macro_start = ConfigItem("Start", ParamType.FLOAT, 0, "backward-step")
-    macro_end = ConfigItem("End", ParamType.FLOAT, 0, "forward-step")
-    macro_microstep = ConfigItem("Microstep", ParamType.FLOAT, 0, "stairs")
-    macro_pitch = ConfigItem("Pitch", ParamType.FLOAT, 0, "reel")
-    macro_delay = ConfigItem("Delay", ParamType.FLOAT, 0, "clock")
+    # timer
+    shutter_lag = ConfigItem[int]("Shut.Delay", ParamType.INT, 0, "chess-clock-flip")
+    release_lag = ConfigItem[int]("Relz.Delay", ParamType.INT, 60, "chess-clock")
+    trigger_read_timer = ConfigItem[int]("ReadTimer", ParamType.INT, 60, "clock")
+
+    # macro
+    macro_enable = ConfigItem[bool]("Use Macro", ParamType.BOOL, False, "flower-tulip")
+    macro_f = ConfigItem[int]("Aperture", ParamType.INT, 0, "aperture")
+    macro_ratio = ConfigItem[float]("Ratio", ParamType.FLOAT, 0, "magnifying-glass")
+    macro_step = ConfigItem[float]("Step", ParamType.FLOAT, 0, "shoe-prints")
+    macro_start = ConfigItem[float]("Start", ParamType.FLOAT, 0, "backward-step")
+    macro_end = ConfigItem[float]("End", ParamType.FLOAT, 0, "forward-step")
+    macro_microstep = ConfigItem[float]("Microstep", ParamType.FLOAT, 0, "stairs")
+    macro_pitch = ConfigItem[float]("Pitch", ParamType.FLOAT, 0, "reel")
+    macro_delay = ConfigItem[float]("Delay", ParamType.FLOAT, 0, "clock")
+
+    # settings
+    night_mode = ConfigItem[bool]("Night Mode", ParamType.BOOL, False, "moon")
+    hwinfo_enable = ConfigItem[bool]("HWInfo", ParamType.BOOL, False, "microchip")
+
+    # bt
+    bt_enable = ConfigItem[bool]("Enable BT", ParamType.BOOL, False, "bluetooth-b")
+    bt_bulb = ConfigItem[bool]("BULB mode", ParamType.BOOL, False, "hand-point-down")
+    bt_af_enable = ConfigItem[bool]("Enable AF", ParamType.BOOL, False, "users-viewfinder")
 
     def __init__(self, storage: Any) -> None:
         self.storage = storage
         for item in self.__class__.__dict__.values():
             if isinstance(item, ConfigItem):
                 item.storage = self.storage
+
+    def __getattr__(self, name: str) -> Any:
+        return DummyConfigItem[bool](title=name, param_type=ParamType.BOOL, default_value=False)

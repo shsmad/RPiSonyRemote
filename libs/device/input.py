@@ -26,6 +26,7 @@ class InputDevice:
         self.config = config
         self.bus = EventBusDefaultDict()
         self.bus.add_listener(ConfigChangeEvent, self.on_config_change)
+        logger.info(f"Created input device {self.__class__.__name__}")
 
     def set_notify_callback(self, callback: Any) -> None:
         self.notify_callback = callback
@@ -39,7 +40,7 @@ class InputDevice:
     def disable(self) -> None:
         pass
 
-    def on_config_change(self, event: ConfigChangeEvent) -> None:
+    async def on_config_change(self, event: ConfigChangeEvent) -> None:
         pass
 
 
