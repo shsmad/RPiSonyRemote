@@ -7,8 +7,8 @@ from libs.eventbus import EventBusDefaultDict
 from libs.eventtypes import ButtonClickEvent, ButtonHoldEvent, ButtonPressEvent, ButtonStepEvent, Event
 from libs.utils import RepeatTimer
 
-KEY_DOWN = GPIO.LOW  # type: ignore
-KEY_UP = GPIO.HIGH  # type: ignore
+KEY_DOWN = GPIO.LOW
+KEY_UP = GPIO.HIGH
 MS_CONVERSION_FACTOR = 1000000  # constant to convert ns to ms
 
 
@@ -27,7 +27,7 @@ class Button:
         self.click_count_time = click_count_time
         self.step_count_time = step_count_time
 
-        self.state = GPIO.HIGH  # type: ignore
+        self.state = int(GPIO.HIGH)
         self.last_change_time = time.monotonic_ns() // MS_CONVERSION_FACTOR  # ms
         self.click_count = 0
         self.steps_count = 0
@@ -38,7 +38,7 @@ class Button:
 
         self.loop = asyncio.get_event_loop()
 
-        GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # type: ignore
+        GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self.timer = RepeatTimer(0.05, self.tick)
 
         self.timer.start()
@@ -54,7 +54,7 @@ class Button:
         )
 
     def tick(self) -> None:
-        new_state = GPIO.input(self.pin)  # type: ignore
+        new_state = GPIO.input(self.pin)
         old_state = self.state
 
         if new_state == KEY_UP and old_state == KEY_UP:
@@ -95,4 +95,4 @@ class Button:
                 self._emit_event(ButtonHoldEvent(pin=self.pin, hold_time=time_passed - self.hold_time))
 
     def cleanup(self) -> None:
-        GPIO.cleanup(self.pin)  # type: ignore
+        GPIO.cleanup(self.pin)
