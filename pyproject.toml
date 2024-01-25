@@ -14,6 +14,7 @@ dependencies = [
     "RPi_AS3935",
     "smbus",
     "pyyaml>=6.0.1",
+    "rpimotorlib>=3.2",
 ]
 requires-python = ">=3.9"
 readme = "README.md"

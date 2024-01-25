@@ -141,6 +141,7 @@ def calc(
     sensor_width: Optional[float] = None,
     sensor_width_px: Optional[float] = None,
     coc_width_px: Optional[float] = 3,
+    step_overlap: float = 0.0,
 ) -> Optional[DOFResult]:
     # usage 1: magnification + lens_aperture
     # usage 2: magnification + lens_aperture + coc_width_mm
@@ -165,7 +166,7 @@ def calc(
     else:
         dof_classic = 0.0
 
-    return calculate_suggested_step_size(dof_classic=dof_classic, dof_optic=dof_optic, step_overlap=0)
+    return calculate_suggested_step_size(dof_classic=dof_classic, dof_optic=dof_optic, step_overlap=step_overlap)
 
 
 if __name__ == "__main__":
